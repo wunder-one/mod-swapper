@@ -1,5 +1,7 @@
+from app_settings import load_config, save_config
+
 def main():
-    print("Hello from mod-swapper!")
+    config = load_config()
 
 
 if __name__ == "__main__":
