@@ -31,10 +31,15 @@ def save_live_to_profile(profile_name):
         )
 
 def load_profile_to_live(profile_name):
-    mirror_directory(
-        PROFILES_SNAPSHOT_DIR / profile_name, 
-        TEST_LIVE_MODS_DIR,
-        )
+    try:
+        mirror_directory(
+            PROFILES_SNAPSHOT_DIR / profile_name, 
+            TEST_LIVE_MODS_DIR,
+            )
+        # write to config file here
+    except Exception as e:
+        print(f"Error loading profile '{profile_name}': {e}")
+    
 
 def swap_profiles(current_profile, profile_to_load):
     save_live_to_profile(current_profile)
