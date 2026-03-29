@@ -4,28 +4,23 @@ import json
 import ui.app
 from constants import PROFILES_SNAPSHOT_DIR, USER_CONFIG_DIR, USER_CONFIG_FILE
 
-current_profile = None
+active_profile = None
 
 def main():
-    PROFILES_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
-    profiles = {}
-    for dir in PROFILES_SNAPSHOT_DIR.iterdir():
-        if dir.is_dir():
-            print(f"Found profile: {dir.name}")
-            profiles[dir.name] = dir
+
 
     # ----- TESTING ONLY: move this to a class -----
     USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     USER_CONFIG_FILE.touch(exist_ok=True)
     # with open(USER_CONFIG_FILE, "w") as f:
-    #     json.dump({"current_profile": "Profile B"}, f, indent=4)
+    #     json.dump({"active_profile": "Profile B"}, f, indent=4)
     with open(USER_CONFIG_FILE, "r") as f:
         app_config = json.load(f)
-    global current_profile
-    current_profile = app_config.get("current_profile", None)
-    print(f"Current profile: {current_profile}")
+    global active_profile
+    active_profile = app_config.get("active_profile", None)
+    print(f"Current profile: {active_profile}")
 
-    app = ui.app.App(current_profile=current_profile, profiles=list(profiles.keys()))
+    app = ui.app.App(active_profile=active_profile, profiles=list(profiles.keys()))
     app.mainloop()
 
 

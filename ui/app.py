@@ -31,9 +31,9 @@ class ProfileSelectorFrame(customtkinter.CTkFrame):
     
 
 class App(customtkinter.CTk):
-    def __init__(self, current_profile=None, profiles=[]):
+    def __init__(self, active_profile=None, profiles=[]):
         super().__init__()
-        self.current_profile = current_profile
+        self.active_profile = active_profile
         self.profiles = profiles
 
         self.title("BG3 Profile Swapper")
@@ -41,7 +41,7 @@ class App(customtkinter.CTk):
         self.grid_columnconfigure((0, 0), weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.profile_selector_frame = ProfileSelectorFrame(self, "Profiles", status=current_profile, values=self.profiles)
+        self.profile_selector_frame = ProfileSelectorFrame(self, "Profiles", status=active_profile, values=self.profiles)
         self.profile_selector_frame.grid(row=0, column=0, padx=(0, 10), pady=(10, 0), sticky="nsew")
         self.profile_selector_frame.configure(fg_color="transparent")
 
@@ -51,6 +51,6 @@ class App(customtkinter.CTk):
     def button_callback(self):
         print("profile_selector_frame:", self.profile_selector_frame.get())
         selected_profile = self.profile_selector_frame.get()
-        if selected_profile and selected_profile != self.current_profile:
-            self.current_profile = swap_profiles(self.current_profile, selected_profile)
-            self.profile_selector_frame.label.configure(text=f"Current Profile: {self.current_profile}")
+        if selected_profile and selected_profile != self.active_profile:
+            self.active_profile = swap_profiles(self.active_profile, selected_profile)
+            self.profile_selector_frame.label.configure(text=f"Current Profile: {self.active_profile}")

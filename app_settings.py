@@ -1,59 +1,37 @@
 import json
 import os
-from dataclasses import dataclass, asdict, fields
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
+from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR, USER_CONFIG_FILE
 
 @dataclass
 class AppConfig:
     active_profile: str = ""
-    mods_directory: str = ""
-    storage_directory: str = ""
+    profiles: dict = field(init=False)  # Don't initialize in __init__
 
-def get_config_path() -> Path:
-    roaming = os.getenv("APPDATA")
-    return Path(roaming) / "BGProfileSwapper" / "config.json"
+    def __post_init__(self):
+        self.profiles = self.get_profiles()
 
-def load_config() -> AppConfig:
-    path = get_config_path()
-    if not path.exists():
-        return AppConfig()  # return defaults if no file yet
-    with open(path, "r") as f:
-        data = json.load(f)
-    return AppConfig(**data)
+    def get_profiles() -> dict:
+        if not PROFILES_SNAPSHOT_DIR.exists():
+            PROFILES_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+            return {}
+        profiles = {}
+        for dir in PROFILES_SNAPSHOT_DIR.iterdir():
+            if dir.is_dir():
+                print(f"Found profile: {dir.name}")
+                profiles[dir.name] = dir
+        return profiles
 
-def save_config(config: AppConfig):
-    path = get_config_path()
-    path.parent.mkdir(parents=True, exist_ok=True)  # create folders if needed
-    with open(path, "w") as f:
-        json.dump(asdict(config), f, indent=2)
+    def load_config() -> AppConfig:
+        if not USER_CONFIG_FILE.exists():
+            return AppConfig()  # return defaults if no file yet
+        with open(USER_CONFIG_FILE, "r") as f:
+            data = json.load(f)
+        return AppConfig(**data)
 
-@dataclass
-class Profile:
-    name: str
-    description: str = ""
-    # add profile fields here as needed.
+    def save_config(config: AppConfig):
+        USER_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)  # create folders if needed
+        with open(USER_CONFIG_FILE, "w") as f:
+            json.dump(asdict(config), f, indent=2)
 
-def get_profile_path(profile_name: str) -> Path:
-    roaming = os.getenv("APPDATA")
-    return Path(roaming) / "BGProfileSwapper" / "profiles" / f"{profile_name}.json"
-
-def load_profile(profile_name: str) -> Profile:
-    path = get_profile_path(profile_name)
-    with open(path, "r") as f:
-        data = json.load(f)
-    known = {f.name for f in fields(Profile)}
-    filtered = {k: v for k, v in data.items() if k in known}
-    return Profile(**filtered)
-
-def save_profile(profile: Profile):
-    path = get_profile_path(profile.name)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(asdict(profile), f, indent=2)
-
-def list_profiles() -> list[str]:
-    roaming = os.getenv("APPDATA")
-    profiles_dir = Path(roaming) / "BGProfileSwapper" / "profiles"
-    if not profiles_dir.exists():
-        return []
-    return [p.stem for p in profiles_dir.glob("*.json")]
