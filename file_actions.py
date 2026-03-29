@@ -2,8 +2,6 @@ import subprocess
 import os
 import json
 from pathlib import Path
-
-from app_settings import save_config
 from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR, USER_CONFIG_FILE
 
 def mirror_directory(source_dir, dest_dir):
@@ -26,29 +24,28 @@ def save_live_to_profile(profile_name):
         PROFILES_SNAPSHOT_DIR / profile_name,
         )
 
-def load_profile_to_live(profile_name):
+def load_profile_to_live(profile_name, cfg):
     try:
         mirror_directory(
             PROFILES_SNAPSHOT_DIR / profile_name, 
             TEST_LIVE_MODS_DIR,
             )
         # write to config file here
-        save_config()
+        print(f"Setting active profile to '{profile_name}' in config...")
+        cfg.active_profile = profile_name
+        cfg.save_config()
     except Exception as e:
         print(f"Error loading profile '{profile_name}': {e}")
-    
 
-def swap_profiles(current_profile, profile_to_load):
-    save_live_to_profile(current_profile)
-    print(f"{current_profile} saved to profile storage.")
-    PROFILE_SNAPSHOT_DIR = PROFILES_SNAPSHOT_DIR / profile_to_load
-    if PROFILE_SNAPSHOT_DIR.exists():
-        load_profile_to_live(profile_to_load)
-        with open(USER_CONFIG_FILE, "w") as f:
-            json.dump({"current_profile": current_profile}, f, indent=4)
+def swap_profiles(profile_to_load, cfg):
+    print(f"Swapping from {cfg.active_profile} to {profile_to_load}...")
+    save_live_to_profile(cfg.active_profile)
+    print(f"{cfg.active_profile} saved to profile storage.")
+    profile_to_load_dir = PROFILES_SNAPSHOT_DIR / profile_to_load
+    if profile_to_load_dir.exists():
+        load_profile_to_live(profile_to_load, cfg)
     else:
         print(f"Profile '{profile_to_load}' does not exist in storage. No changes made to live mods.")
         return
-    print(f"{profile_to_load} loaded to live mods.")
-    current_profile = profile_to_load
-    return current_profile
+    print(f"{profile_to_load} loaded to live mods.")    
+    return cfg.active_profile

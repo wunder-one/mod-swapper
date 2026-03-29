@@ -30,14 +30,18 @@ class AppConfig:
             return cls()
         with USER_CONFIG_FILE.open("r", encoding="utf-8") as f:
             data = json.load(f)
-
+        print(f"Raw config data loaded: {data}")
         # Avoid breaking if config file contains unknown fields
         allowed_keys = {f.name for f in cls.__dataclass_fields__.values() if f.init}
+        print(f"Allowed config keys: {allowed_keys}")
         filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
-
+        print(f"Loaded config: {filtered_data}")
         return cls(**filtered_data)
 
     def save_config(self):
         USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        USER_CONFIG_FILE.write_text(json.dumps(asdict(self), indent=4), encoding="utf-8")
-
+        data = asdict(self)
+        # Convert Path objects to strings for JSON serialization
+        if isinstance(data.get("profiles"), dict):
+            data["profiles"] = {k: str(v) for k, v in data["profiles"].items()}
+        USER_CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
