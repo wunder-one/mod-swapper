@@ -1,7 +1,8 @@
 import subprocess
 import os
+import json
 from pathlib import Path
-from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR
+from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR, USER_CONFIG_FILE
 
 def mirror_directory(source_dir, dest_dir):
     result = subprocess.run([
@@ -40,7 +41,11 @@ def swap_profiles(current_profile, profile_to_load):
     PROFILE_SNAPSHOT_DIR = PROFILES_SNAPSHOT_DIR / profile_to_load
     if PROFILE_SNAPSHOT_DIR.exists():
         load_profile_to_live(profile_to_load)
+        with open(USER_CONFIG_FILE, "w") as f:
+            json.dump({"current_profile": current_profile}, f, indent=4)
     else:
         print(f"Profile '{profile_to_load}' does not exist in storage. No changes made to live mods.")
         return
     print(f"{profile_to_load} loaded to live mods.")
+    current_profile = profile_to_load
+    return current_profile

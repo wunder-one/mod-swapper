@@ -4,6 +4,8 @@ import json
 import ui.app
 from constants import PROFILES_SNAPSHOT_DIR, USER_CONFIG_DIR, USER_CONFIG_FILE
 
+current_profile = None
+
 def main():
     PROFILES_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
     profiles = {}
@@ -19,12 +21,12 @@ def main():
     #     json.dump({"current_profile": "Profile B"}, f, indent=4)
     with open(USER_CONFIG_FILE, "r") as f:
         app_config = json.load(f)
-    print(f"Current profile: {app_config.get('current_profile', None)}")
+    global current_profile
+    current_profile = app_config.get("current_profile", None)
+    print(f"Current profile: {current_profile}")
 
-    app = ui.app.App()
+    app = ui.app.App(current_profile=current_profile, profiles=list(profiles.keys()))
     app.mainloop()
-
-# def get_profiles():
 
 
 if __name__ == "__main__":
