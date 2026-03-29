@@ -2,6 +2,8 @@ import subprocess
 import os
 import json
 from pathlib import Path
+
+from app_settings import save_config
 from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR, USER_CONFIG_FILE
 
 def mirror_directory(source_dir, dest_dir):
@@ -31,6 +33,7 @@ def load_profile_to_live(profile_name):
             TEST_LIVE_MODS_DIR,
             )
         # write to config file here
+        save_config()
     except Exception as e:
         print(f"Error loading profile '{profile_name}': {e}")
     

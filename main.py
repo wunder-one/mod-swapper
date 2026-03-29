@@ -2,12 +2,12 @@
 import json
 
 import ui.app
+from app_settings import load_config
 from constants import PROFILES_SNAPSHOT_DIR, USER_CONFIG_DIR, USER_CONFIG_FILE
 
-active_profile = None
-
 def main():
-
+    cfg = load_config()
+    print(f"Active profile from config: {cfg.active_profile}")
 
     # ----- TESTING ONLY: move this to a class -----
     USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
