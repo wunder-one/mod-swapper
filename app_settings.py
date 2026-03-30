@@ -30,7 +30,7 @@ class AppConfig:
             return cls()
         with USER_CONFIG_FILE.open("r", encoding="utf-8") as f:
             data = json.load(f)
-        print(f"Raw config data loaded: {data}")
+        # print(f"Raw config data loaded: {data}")
         # Avoid breaking if config file contains unknown fields
         allowed_keys = {f.name for f in cls.__dataclass_fields__.values() if f.init}
         print(f"Allowed config keys: {allowed_keys}")

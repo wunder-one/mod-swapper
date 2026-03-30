@@ -1,48 +1,48 @@
 import customtkinter
 
-from functions.file_actions import swap_profiles
+from functions.file_actions import swap_profiles, create_new_profile
 
 class App(customtkinter.CTk):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.profile_list = list(cfg.profiles.keys())
-        self.profile_frames = []
+        self.profile_list = list(self.cfg.profiles.keys())
+        self.profile_frames = {}
 
         self.title("BG3 Profile Swapper")
-        self.geometry(f"{190 * len(self.profile_list)}x280")
-        self.grid_rowconfigure(1, weight=1)
+        self.geometry(f"{190 * 3}x280")
+        self.grid_columnconfigure((0, 1, 2), weight=1)
+        # self.grid_rowconfigure(1, weight=1)
 
         self.button_bar = ButtonBar(self, self.profile_list, self.cfg)
-        self.button_bar.grid(row=0, column=0, columnspan=len(self.profile_list), sticky="ew")
+        self.button_bar.grid(row=0, column=0, columnspan=3, sticky="ew")
         self.button_bar.configure(fg_color="transparent")
         self.create_profile_frames()
 
     def create_profile_frames(self):
-        for i, profile in enumerate(self.profile_list):
-            self.grid_columnconfigure(i, weight=1)
-            self.profile_frame = ProfileFrame(self, profile, self.cfg)
-            left_pad = 10 if i == 0 else 0
-            self.profile_frame.grid(row=1, column=i, padx=(left_pad, 10), pady=(10, 10), sticky="nsew")
+        self.profile_list = list(self.cfg.profiles.keys())
+        print(f"Creating profile frames for profiles: {self.profile_list}")
+        for i, profile_name in enumerate(self.profile_list):
+            profile_frame = ProfileFrame(self, profile_name, self.cfg)
+            left_pad = 10 if i % 3 == 0 else 0
+            print(f"Placing profile frame for '{profile_name}' at row {i // 3 + 1}, column {i % 3} with left padding {left_pad}")
+            profile_frame.grid(row=i // 3 + 1, column=i % 3, padx=(left_pad, 10), pady=(10, 10), sticky="nsew")
             # self.profile_frame.configure(fg_color="transparent")
-            self.profile_frames.append(self.profile_frame)
-            new_profile_frame_index = i + 1
+            self.profile_frames[profile_name] = profile_frame
         self.update_profile_frames()
 
     def update_profile_frames(self):
-        for frame in self.profile_frames:
+        for frame_title in self.profile_frames:
+            frame = self.profile_frames[frame_title]
             frame.set_active_appearance(frame.profile == self.cfg.active_profile)
 
     def refresh_profiles(self):
         print("Refreshing profiles...")
         # Clear existing frames
-        for frame in self.profile_frames:
+        for frame_title in self.profile_frames:
+            frame = self.profile_frames[frame_title]
             frame.destroy()
         self.profile_frames.clear()
-
-        # Reload profiles from config
-        self.cfg.profiles = self.cfg.get_profiles()
-        self.profile_list = list(self.cfg.profiles.keys())
         self.create_profile_frames()
 
     # ----- Full width button for later -----
@@ -97,5 +97,8 @@ class ButtonBar(customtkinter.CTkFrame):
         self.settings_button.grid(row=0, column=1, padx=(0, 10), pady=(10, 0), sticky="w")
 
     def new_profile_callback(self):
-        new_profile_name_dialog = customtkinter.CTkInputDialog(text="This will create a new profile from your currently active mods.\n\nProfile Name:", title="New Profile")
-        print("Name:", new_profile_name_dialog.get_input())
+        new_profile_dialog = customtkinter.CTkInputDialog(text="This will create a new profile from your currently active mods.\n\nProfile Name:", title="New Profile")
+        new_name = new_profile_dialog.get_input()
+        print("Name:", new_name)
+        create_new_profile(new_name, self.cfg)
+        self.master.refresh_profiles()
