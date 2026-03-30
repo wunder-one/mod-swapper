@@ -1,6 +1,6 @@
 import customtkinter
 
-from file_actions import swap_profiles
+from functions.file_actions import swap_profiles
 
 class App(customtkinter.CTk):
     def __init__(self, cfg):
@@ -10,28 +10,23 @@ class App(customtkinter.CTk):
         self.profile_frames = []
 
         self.title("BG3 Profile Swapper")
-        self.geometry(f"{190 * len(self.profile_list)}x240")
-        self.grid_rowconfigure(0, weight=1)
+        self.geometry(f"{190 * len(self.profile_list)}x280")
+        self.grid_rowconfigure(1, weight=1)
+
+        self.button_bar = ButtonBar(self, self.profile_list, self.cfg)
+        self.button_bar.grid(row=0, column=0, columnspan=len(self.profile_list), sticky="ew")
+        self.button_bar.configure(fg_color="transparent")
         self.create_profile_frames()
-        # self.test_button = customtkinter.CTkButton(self, text="Refresh", command=self.refresh_profiles)
-        # self.test_button.grid(row=3, column=0, padx=10, pady=10, sticky="ew", columnspan=len(self.profile_list))
-    def combobox_callback(choice):
-        print("combobox dropdown clicked:", choice)
 
     def create_profile_frames(self):
         for i, profile in enumerate(self.profile_list):
             self.grid_columnconfigure(i, weight=1)
             self.profile_frame = ProfileFrame(self, profile, self.cfg)
-            if i == 0:
-                self.profile_frame.grid(row=0, column=i, padx=(10, 10), pady=(10, 10), sticky="nsew")
-            else:
-                self.profile_frame.grid(row=0, column=i, padx=(0, 10), pady=(10, 10), sticky="nsew")
+            left_pad = 10 if i == 0 else 0
+            self.profile_frame.grid(row=1, column=i, padx=(left_pad, 10), pady=(10, 10), sticky="nsew")
             # self.profile_frame.configure(fg_color="transparent")
             self.profile_frames.append(self.profile_frame)
             new_profile_frame_index = i + 1
-        self.new_profile_frame = NewProfileFrame(self, self.cfg)
-        self.new_profile_frame.configure(fg_color=("gray86", "gray17"))
-        self.new_profile_frame.grid(row=0, column=new_profile_frame_index, padx=(0, 10), pady=(10, 10), sticky="nsew")
         self.update_profile_frames()
 
     def update_profile_frames(self):
@@ -88,15 +83,19 @@ class ProfileFrame(customtkinter.CTkFrame):
             self.configure(fg_color=("gray98", "gray11"), border_width=0)
             self.activate_button.configure(state="normal", fg_color=("#3B8ED0", "#1F6AA5"), text="Activate Profile")
 
-    def get(self):
-        return self.variable.get()
-
-    def set(self, value):
-        self.variable.set(value)
-
-class NewProfileFrame(customtkinter.CTkFrame):
-    def __init__(self, master, cfg):
+class ButtonBar(customtkinter.CTkFrame):
+    def __init__(self, master, profile, cfg):
         super().__init__(master)
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        # self.grid_columnconfigure(0, weight=1)
+        self.profile = profile
         self.cfg = cfg
+
+        self.new_profile_button = customtkinter.CTkButton(self, text="New Profile", command=self.new_profile_callback, width=100)
+        self.new_profile_button.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
+
+        self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self.master.refresh_profiles, width=100)
+        self.settings_button.grid(row=0, column=1, padx=(0, 10), pady=(10, 0), sticky="w")
+
+    def new_profile_callback(self):
+        new_profile_name_dialog = customtkinter.CTkInputDialog(text="This will create a new profile from your currently active mods.\n\nProfile Name:", title="New Profile")
+        print("Name:", new_profile_name_dialog.get_input())
