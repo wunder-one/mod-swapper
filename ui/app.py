@@ -15,18 +15,16 @@ class App(customtkinter.CTk):
         # self.grid_rowconfigure(1, weight=1)
 
         self.button_bar = ButtonBar(self, self.profile_list, self.cfg)
-        self.button_bar.grid(row=0, column=0, columnspan=3, sticky="ew")
-        self.button_bar.configure(fg_color="transparent")
+        self.button_bar.grid(row=0, column=0, pady=(0, 0), columnspan=3, sticky="ew")
+        self.button_bar.configure(corner_radius=0)
         self.create_profile_frames()
 
     def create_profile_frames(self):
         self.profile_list = list(self.cfg.profiles.keys())
-        print(f"Creating profile frames for profiles: {self.profile_list}")
         for i, profile_name in enumerate(self.profile_list):
             profile_frame = ProfileFrame(self, profile_name, self.cfg)
             left_pad = 10 if i % 3 == 0 else 0
-            print(f"Placing profile frame for '{profile_name}' at row {i // 3 + 1}, column {i % 3} with left padding {left_pad}")
-            profile_frame.grid(row=i // 3 + 1, column=i % 3, padx=(left_pad, 10), pady=(10, 10), sticky="nsew")
+            profile_frame.grid(row=i // 3 + 1, column=i % 3, padx=(left_pad, 10), pady=(10, 0), sticky="nsew")
             # self.profile_frame.configure(fg_color="transparent")
             self.profile_frames[profile_name] = profile_frame
         self.update_profile_frames()
@@ -58,8 +56,6 @@ class ProfileFrame(customtkinter.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
         self.profile = profile
         self.cfg = cfg
-        print(f"Self Profile: {self.profile}")
-        print(f"CFG Active Profile: {self.cfg.active_profile}")
 
         self.title = customtkinter.CTkLabel(self, text=self.profile, corner_radius=6)
         self.title.cget("font").configure(size=16, weight="bold")
@@ -86,15 +82,18 @@ class ProfileFrame(customtkinter.CTkFrame):
 class ButtonBar(customtkinter.CTkFrame):
     def __init__(self, master, profile, cfg):
         super().__init__(master)
-        # self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(2, weight=1)
         self.profile = profile
         self.cfg = cfg
 
         self.new_profile_button = customtkinter.CTkButton(self, text="New Profile", command=self.new_profile_callback, width=100)
-        self.new_profile_button.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
+        self.new_profile_button.grid(row=0, column=0, padx=(6, 0), pady=6)
+
+        self.overwrite_button = customtkinter.CTkButton(self, text="Overwrite Profile", command=self.new_profile_callback, width=100)
+        self.overwrite_button.grid(row=0, column=1, padx=(6, 0), pady=6)
 
         self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self.master.refresh_profiles, width=100)
-        self.settings_button.grid(row=0, column=1, padx=(0, 10), pady=(10, 0), sticky="w")
+        self.settings_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
 
     def new_profile_callback(self):
         new_profile_dialog = customtkinter.CTkInputDialog(text="This will create a new profile from your currently active mods.\n\nProfile Name:", title="New Profile")
