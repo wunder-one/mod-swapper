@@ -98,6 +98,9 @@ class ButtonBar(customtkinter.CTkFrame):
     def new_profile_callback(self):
         new_profile_dialog = customtkinter.CTkInputDialog(text="This will create a new profile from your currently active mods.\n\nProfile Name:", title="New Profile")
         new_name = new_profile_dialog.get_input()
+        if new_name is None or new_name.strip() == "":
+            print("Profile creation cancelled or invalid name entered.")
+            return
         print("Name:", new_name)
         create_new_profile(new_name, self.cfg)
         self.master.refresh_profiles()
