@@ -13,7 +13,6 @@ class AppConfig:
         if not PROFILES_SNAPSHOT_DIR.exists():
             PROFILES_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
             return {}
-        
         # This list comprehension runs every time you access 'config.profiles'
         return {d.name: d for d in PROFILES_SNAPSHOT_DIR.iterdir() if d.is_dir()}
 

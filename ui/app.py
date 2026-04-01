@@ -65,10 +65,15 @@ class ProfileFrame(customtkinter.CTkFrame):
         self.activate_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
     def activate_button_callback(self):
-        if self.profile != self.cfg.active_profile:
+        try:
             swap_profiles(self.profile, self.cfg)
-        else:
-            print("No profile selected or selected profile is already active.")
+            # Success! Play sound or update status here
+        except ValueError as e:
+            print(f"Notice: {e}")
+        except Exception as e:
+            print(f"Error swapping profiles: {e}")
+        
+        # Always update the UI frames to reflect the current state
         self.master.update_profile_frames()
 
     def set_active_appearance(self, is_active):
