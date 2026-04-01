@@ -10,7 +10,9 @@ class App(customtkinter.CTk):
         self.profile_frames = {}
 
         self.title("BG3 Profile Swapper")
-        self.geometry(f"{190 * 3}x280")
+        no_of_rows = (len(self.profile_list) - 1) // 3 + 1
+        self.geometry(f"{190 * 3}x{52 + 96 * no_of_rows}")
+        print(f"no_of_rows: {no_of_rows}")
         self.grid_columnconfigure((0, 1, 2), weight=1)
         # self.grid_rowconfigure(1, weight=1)
 

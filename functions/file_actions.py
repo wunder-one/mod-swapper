@@ -37,9 +37,6 @@ def save_live_to_profile(profile_name: str):
 
 def load_profile_to_live(profile_name: str, cfg: AppConfig):
     mirror_directory(PROFILES_SNAPSHOT_DIR / profile_name, TEST_LIVE_MODS_DIR,)
-    print(f"Setting active profile to '{profile_name}' in config...")
-    cfg.active_profile = profile_name
-    cfg.save_config()
 
 def swap_profiles(profile_to_load: str, cfg: AppConfig):
     # Validations
@@ -57,6 +54,7 @@ def swap_profiles(profile_to_load: str, cfg: AppConfig):
     # Saving current profile
     old_profile = cfg.active_profile
     backup_created = False
+    backup_profile = None
     if not old_profile:
         backup_profile = get_unique_path(PROFILES_SNAPSHOT_DIR / "Backed Up Profile")
         backup_profile.mkdir(parents=True, exist_ok=False)
@@ -72,12 +70,22 @@ def swap_profiles(profile_to_load: str, cfg: AppConfig):
     try:
         load_profile_to_live(profile_to_load, cfg)
         print(f"{profile_to_load} loaded to live mods.")
+        cfg.active_profile = profile_to_load
+        cfg.save_config()
+        print(f"Updated active profile to '{profile_to_load}' in config...")
         return cfg.active_profile   
     except Exception as e:
-        print("Loading failed, rolling back to old profile...")
-        rollback_profile = backup_profile.name if backup_created else old_profile
-        load_profile_to_live(rollback_profile, cfg)
-    raise RuntimeError(f"Failed to load profile '{profile_to_load}'. Rolled back.") from e
+        try:
+            print("Loading failed, rolling back to old profile...")
+            rollback_profile = backup_profile.name if backup_created else old_profile
+            load_profile_to_live(rollback_profile, cfg)
+            cfg.active_profile = rollback_profile
+            cfg.save_config()
+            print(f"Updated active profile to '{rollback_profile}' in config...")
+        except Exception as rollback_error:
+            print(f"Rollback failed: {rollback_error}")
+            raise RuntimeError("Critical error: Failed to load new profile and rollback also failed. Live mods may be in an inconsistent state.") from rollback_error
+        raise RuntimeError(f"Failed to load profile '{profile_to_load}'. Rolled back.") from e
 
 
 def create_new_profile(profile_name: str, cfg: AppConfig):
