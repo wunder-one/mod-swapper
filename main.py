@@ -1,16 +1,16 @@
 import ui.app
-from app_settings import AppConfig
+from profile_state import ProfileState
 
 def main():
-    cfg = AppConfig.load_config()
-    print(f"Active profile from config: {cfg.active_profile}")
-    print(f"Available profiles: {list(cfg.profiles.keys())}")
+    prof_state = ProfileState.load_config()
+    print(f"Active profile from config: {prof_state.active_profile}")
+    print(f"Available profiles: {list(prof_state.profiles.keys())}")
 
-    app = ui.app.App(cfg=cfg)
+    app = ui.app.App(prof_state=prof_state)
     app.mainloop()
 
     print("Saving configuration...")
-    cfg.save_config()
+    prof_state.save_config()
     print("Shutdown complete.")
 
 

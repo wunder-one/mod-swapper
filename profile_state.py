@@ -1,10 +1,10 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from constants import PROFILES_SNAPSHOT_DIR, USER_CONFIG_DIR, USER_CONFIG_FILE
+from constants import PROFILES_SNAPSHOT_DIR, USER_CONFIG_DIR, PROFILE_STATE_FILE
 
 @dataclass
-class AppConfig:
+class ProfileState:
     active_profile: str = ""
 
     @property
@@ -23,14 +23,14 @@ class AppConfig:
         data = {"active_profile": self.active_profile}
         # The default=str handles Path objects automatically!
         json_data = json.dumps(data, indent=4, default=str)
-        USER_CONFIG_FILE.write_text(json_data, encoding="utf-8")
+        PROFILE_STATE_FILE.write_text(json_data, encoding="utf-8")
 
     @classmethod
-    def load_config(cls) -> "AppConfig":
-        if not USER_CONFIG_FILE.exists():
+    def load_config(cls) -> "ProfileState":
+        if not PROFILE_STATE_FILE.exists():
             return cls()
         try:
-            with USER_CONFIG_FILE.open("r", encoding="utf-8") as f:
+            with PROFILE_STATE_FILE.open("r", encoding="utf-8") as f:
                 data = json.load(f)
 
             # Avoid breaking if config file contains unknown fields

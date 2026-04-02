@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR
-from app_settings import AppConfig
+from profile_state import ProfileState
 
 def mirror_directory(source_dir, dest_dir):
     result = subprocess.run([
@@ -35,13 +35,13 @@ def save_live_to_profile(profile_name: str):
         PROFILES_SNAPSHOT_DIR / profile_name,
         )
 
-def load_profile_to_live(profile_name: str, cfg: AppConfig):
+def load_profile_to_live(profile_name: str, prof_state: ProfileState):
     mirror_directory(PROFILES_SNAPSHOT_DIR / profile_name, TEST_LIVE_MODS_DIR,)
 
-def swap_profiles(profile_to_load: str, cfg: AppConfig):
+def swap_profiles(profile_to_load: str, prof_state: ProfileState):
     # Validations
     # Check if the selected profile is already active
-    if cfg.active_profile == profile_to_load:
+    if prof_state.active_profile == profile_to_load:
         print(f"'{profile_to_load}' is already the active profile. No changes made.")
         raise ValueError("Selected profile is already active.")
     # Check if the profile to load exists in storage
@@ -52,7 +52,7 @@ def swap_profiles(profile_to_load: str, cfg: AppConfig):
     # --- End of validations ---
 
     # Saving current profile
-    old_profile = cfg.active_profile
+    old_profile = prof_state.active_profile
     backup_created = False
     backup_profile = None
     if not old_profile:
@@ -62,25 +62,25 @@ def swap_profiles(profile_to_load: str, cfg: AppConfig):
         save_live_to_profile(backup_profile.name)
         backup_created = True
     else:
-        print(f"Swapping from {cfg.active_profile} to {profile_to_load}...")
-        save_live_to_profile(cfg.active_profile)
-        print(f"{cfg.active_profile} saved to profile storage.")
+        print(f"Swapping from {prof_state.active_profile} to {profile_to_load}...")
+        save_live_to_profile(prof_state.active_profile)
+        print(f"{prof_state.active_profile} saved to profile storage.")
 
     # Loading new profile
     try:
-        load_profile_to_live(profile_to_load, cfg)
+        load_profile_to_live(profile_to_load, prof_state)
         print(f"{profile_to_load} loaded to live mods.")
-        cfg.active_profile = profile_to_load
-        cfg.save_config()
+        prof_state.active_profile = profile_to_load
+        prof_state.save_config()
         print(f"Updated active profile to '{profile_to_load}' in config...")
-        return cfg.active_profile   
+        return prof_state.active_profile   
     except Exception as e:
         try:
             print("Loading failed, rolling back to old profile...")
             rollback_profile = backup_profile.name if backup_created else old_profile
-            load_profile_to_live(rollback_profile, cfg)
-            cfg.active_profile = rollback_profile
-            cfg.save_config()
+            load_profile_to_live(rollback_profile, prof_state)
+            prof_state.active_profile = rollback_profile
+            prof_state.save_config()
             print(f"Updated active profile to '{rollback_profile}' in config...")
         except Exception as rollback_error:
             print(f"Rollback failed: {rollback_error}")
@@ -88,10 +88,10 @@ def swap_profiles(profile_to_load: str, cfg: AppConfig):
         raise RuntimeError(f"Failed to load profile '{profile_to_load}'. Rolled back.") from e
 
 
-def create_new_profile(profile_name: str, cfg: AppConfig):
+def create_new_profile(profile_name: str, prof_state: ProfileState):
     unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
     unique_dir.mkdir(parents=True, exist_ok=False)
     profile_name = unique_dir.name
     save_live_to_profile(profile_name)
-    cfg.active_profile = profile_name
-    cfg.save_config()
+    prof_state.active_profile = profile_name
+    prof_state.save_config()
