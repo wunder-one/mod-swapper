@@ -19,6 +19,7 @@ class ProfileState:
     # Now your save_config only needs to worry about settings, not the disk state!
     def save_config(self):
         USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        
         # We don't need asdict(self) anymore if we only have one setting
         data = {"active_profile": self.active_profile}
         # The default=str handles Path objects automatically!

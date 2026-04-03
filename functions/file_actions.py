@@ -1,9 +1,11 @@
 import subprocess
+import json
 from pathlib import Path
-from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR
 from profile_state import ProfileState
+from user_settings import UserSettings
+from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR
 
-def mirror_directory(source_dir, dest_dir):
+def mirror_directory(source_dir: Path, dest_dir: Path):
     result = subprocess.run([
         "robocopy",
         source_dir,
@@ -29,16 +31,38 @@ def get_unique_path(base_path: Path) -> Path:
             return new_path
         counter += 1
 
-def save_live_to_profile(profile_name: str):
-    mirror_directory(
-        TEST_LIVE_MODS_DIR, 
-        PROFILES_SNAPSHOT_DIR / profile_name,
-        )
+def save_live_to_profile(profile_name: str, swap_paths: dict):
+    profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
+    profile_folder.mkdir(parents=True, exist_ok=True)
+    # manifest_data = {"name of folder we are stashed away in": "folder the data came from"}
+    manifest_data = {}
+    for live_folder_name, live_folder in swap_paths.items():
+        storage_folder = get_unique_path(profile_folder / live_folder_name)
+        mirror_directory(live_folder, storage_folder)
+        manifest_data[storage_folder.name] = str(live_folder)
+    json_data = json.dumps(manifest_data, indent=4, default=str)
+    manifest_file = profile_folder / "manifest.json"
+    manifest_file.write_text(json_data, encoding="utf-8")
 
-def load_profile_to_live(profile_name: str, prof_state: ProfileState):
-    mirror_directory(PROFILES_SNAPSHOT_DIR / profile_name, TEST_LIVE_MODS_DIR,)
+def load_profile_to_live(profile_name: str, swap_paths: Path):
+    profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
+    manifest_file = profile_folder / "manifest.json"
+    if manifest_file.exists():
+        with manifest_file.open("r") as f:
+            manifest = json.load(f)
+        for storage_folder_str, live_path_str in manifest["paths"].items():
+            storage_path = Path(storage_folder_str)
+            live_path = Path(live_path_str)
+            
+    else:
+        # logic if we don't have a manifest
+        pass
+    
+    # Now move source_path -> target_path
+    print(f"Restoring {storage_path.name} to {live_path.name}...")
+    mirror_directory(storage_path, live_path)
 
-def swap_profiles(profile_to_load: str, prof_state: ProfileState):
+def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings: UserSettings):
     # Validations
     # Check if the selected profile is already active
     if prof_state.active_profile == profile_to_load:
@@ -59,11 +83,11 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState):
         backup_profile = get_unique_path(PROFILES_SNAPSHOT_DIR / "Backed Up Profile")
         backup_profile.mkdir(parents=True, exist_ok=False)
         print(f"No active profile found. Backing up current live mods to '{backup_profile.name}'...")
-        save_live_to_profile(backup_profile.name)
+        save_live_to_profile(backup_profile.name, user_settings)
         backup_created = True
     else:
         print(f"Swapping from {prof_state.active_profile} to {profile_to_load}...")
-        save_live_to_profile(prof_state.active_profile)
+        save_live_to_profile(prof_state.active_profile, user_settings)
         print(f"{prof_state.active_profile} saved to profile storage.")
 
     # Loading new profile
@@ -88,10 +112,10 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState):
         raise RuntimeError(f"Failed to load profile '{profile_to_load}'. Rolled back.") from e
 
 
-def create_new_profile(profile_name: str, prof_state: ProfileState):
+def create_new_profile(profile_name: str, prof_state: ProfileState, user_settings: UserSettings):
     unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
     unique_dir.mkdir(parents=True, exist_ok=False)
     profile_name = unique_dir.name
-    save_live_to_profile(profile_name)
+    save_live_to_profile(profile_name, user_settings)
     prof_state.active_profile = profile_name
     prof_state.save_config()

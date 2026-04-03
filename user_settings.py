@@ -1,11 +1,9 @@
 import json
+import os
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-import os
 from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, LOCAL_APPDATA, USER_DIR
 
-from pathlib import Path
-import os
 
 '''
 # Future factory fuction for defaults file paths
@@ -35,9 +33,9 @@ def get_bg3_defaults() -> dict[str, Path]:
 
 def get_test_folders() -> dict[str, Path]:
     return {
-        "Test Mod Folder": USER_DIR / "Desktop" / "test_mod_folder",
-        "Test Generated Folder": USER_DIR / "Desktop" / "test_generated_folder",
-        "Test lsx": USER_DIR / "Desktop" / "test_lsx",
+        "Test Mod Folder": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "Test Mod Folder",
+        "Test Generated Folder": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "Test Generated Folder",
+        "Test lsx": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "test_lsx",
     }
 
 @dataclass
