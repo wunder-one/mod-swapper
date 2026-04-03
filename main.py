@@ -8,7 +8,7 @@ def main():
     print(f"Active profile from config: {prof_state.active_profile}")
     print(f"Available profiles: {list(prof_state.profiles.keys())}")
 
-    app = ui.app.App(prof_state=prof_state, user_settings=user_settings)
+    app = ui.app.App(prof_state, user_settings)
     app.mainloop()
 
     print("Saving configuration...")

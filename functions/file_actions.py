@@ -5,20 +5,29 @@ from profile_state import ProfileState
 from user_settings import UserSettings
 from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR
 
-def mirror_directory(source_dir: Path, dest_dir: Path):
-    result = subprocess.run([
+    
+def mirror_directory(source_dir: Path, dest_dir: Path, files: list[str] = None):
+    command = [
         "robocopy",
         source_dir,
         dest_dir,
+    ]
+
+    if files:
+        command.extend(files)
+    
+    command.extend([
         "/MIR",   # mirror
         "/FFT",   # use FAT file times (2-second tolerance, more reliable)
         "/Z",     # restartable mode in case of interruption
-        "/NP"     # no progress percentage in output
-    ], capture_output=True, text=True)
+        "/NP",    # no progress percentage in output
+    ])
+    
+    result = subprocess.run(command, capture_output=True, text=True)
     # Robocopy exit codes 0-7 are success, 8+ are errors
     if result.returncode >= 8:
-        raise RuntimeError(f"Robocopy failed with exit code {result.returncode}")
-    
+        raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stdout}")
+
 def get_unique_path(base_path: Path) -> Path:
     # Returns a Path that doesn't exist by appending (n) if necessary.
     if not base_path.exists():
@@ -36,10 +45,12 @@ def save_live_to_profile(profile_name: str, swap_paths: dict):
     profile_folder.mkdir(parents=True, exist_ok=True)
     # manifest_data = {"name of folder we are stashed away in": "folder the data came from"}
     manifest_data = {}
-    for live_folder_name, live_folder in swap_paths.items():
-        storage_folder = get_unique_path(profile_folder / live_folder_name)
-        mirror_directory(live_folder, storage_folder)
-        manifest_data[storage_folder.name] = str(live_folder)
+    for live_path_name, live_path in swap_paths.items():
+        live_path_folder = live_path if live_path.is_dir() else live_path.parent
+        live_file_path = live_path if live_path.is_file() else None
+        storage_folder = get_unique_path(profile_folder / live_path_name)
+        mirror_directory(live_path_folder, storage_folder, live_file_path)
+        manifest_data[storage_folder.name] = str(live_path)
     json_data = json.dumps(manifest_data, indent=4, default=str)
     manifest_file = profile_folder / "manifest.json"
     manifest_file.write_text(json_data, encoding="utf-8")
@@ -53,10 +64,10 @@ def load_profile_to_live(profile_name: str, swap_paths: Path):
         for storage_folder_str, live_path_str in manifest["paths"].items():
             storage_path = Path(storage_folder_str)
             live_path = Path(live_path_str)
-            
-    else:
-        # logic if we don't have a manifest
-        pass
+
+    else:   # if we don't have a manifest
+        pass    # check if swap_paths exsist in live, or should we throw an error?
+
     
     # Now move source_path -> target_path
     print(f"Restoring {storage_path.name} to {live_path.name}...")

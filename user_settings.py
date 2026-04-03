@@ -35,7 +35,7 @@ def get_test_folders() -> dict[str, Path]:
     return {
         "Test Mod Folder": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "Test Mod Folder",
         "Test Generated Folder": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "Test Generated Folder",
-        "Test lsx": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "test_lsx",
+        "modsettings.lsx": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "modsettings.lsx",
     }
 
 @dataclass
