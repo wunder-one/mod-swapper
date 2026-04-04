@@ -1,5 +1,6 @@
 # Temp and test files
 test/
+test_sandbox.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

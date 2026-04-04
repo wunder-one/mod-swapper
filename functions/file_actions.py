@@ -1,12 +1,13 @@
 import subprocess
 import json
 from pathlib import Path
+from shutil import rmtree
 from profile_state import ProfileState
 from user_settings import UserSettings
-from constants import PROFILES_SNAPSHOT_DIR, TEST_LIVE_MODS_DIR
+from constants import PROFILES_SNAPSHOT_DIR
 
     
-def mirror_directory(source_dir: Path, dest_dir: Path, files: list[str] = None):
+def mirror_directory(source_dir: Path, dest_dir: Path, files: list[Path] = None):
     command = [
         "robocopy",
         source_dir,
@@ -22,7 +23,6 @@ def mirror_directory(source_dir: Path, dest_dir: Path, files: list[str] = None):
         "/Z",     # restartable mode in case of interruption
         "/NP",    # no progress percentage in output
     ])
-    
     result = subprocess.run(command, capture_output=True, text=True)
     # Robocopy exit codes 0-7 are success, 8+ are errors
     if result.returncode >= 8:
@@ -43,13 +43,17 @@ def get_unique_path(base_path: Path) -> Path:
 def save_live_to_profile(profile_name: str, swap_paths: dict):
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     profile_folder.mkdir(parents=True, exist_ok=True)
+    for path in profile_folder.iterdir():
+        if path.name not in swap_paths and path.is_dir():
+            # TODO: Add in error handling for rmtree
+            rmtree(path, ignore_errors=True)
     # manifest_data = {"name of folder we are stashed away in": "folder the data came from"}
     manifest_data = {}
     for live_path_name, live_path in swap_paths.items():
         live_path_folder = live_path if live_path.is_dir() else live_path.parent
-        live_file_path = live_path if live_path.is_file() else None
-        storage_folder = get_unique_path(profile_folder / live_path_name)
-        mirror_directory(live_path_folder, storage_folder, live_file_path)
+        live_filename = [live_path.name] if live_path.is_file() else None
+        storage_folder = profile_folder / live_path_name
+        mirror_directory(live_path_folder, storage_folder, live_filename)
         manifest_data[storage_folder.name] = str(live_path)
     json_data = json.dumps(manifest_data, indent=4, default=str)
     manifest_file = profile_folder / "manifest.json"

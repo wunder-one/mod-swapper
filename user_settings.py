@@ -2,7 +2,7 @@ import json
 import os
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, LOCAL_APPDATA, USER_DIR
+from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, LOCAL_APPDATA, USER_DIR, CRITICAL_GAME_FOLDER_PATHS
 
 
 '''
@@ -30,17 +30,44 @@ def get_bg3_defaults() -> dict[str, Path]:
         "GameData": game_data
     }
 '''
+#     "Data" / "Mods" / "Shared",
+#     "Data" / "Mods" / "SharedDev",
 
-def get_test_folders() -> dict[str, Path]:
-    return {
-        "Test Mod Folder": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "Test Mod Folder",
-        "Test Generated Folder": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "Test Generated Folder",
-        "modsettings.lsx": USER_DIR / "Desktop" / "Mod Swapper Test Folder" / "modsettings.lsx",
-    }
+def get_game_folder():
+    # TODO: Logic for getting the game folder
+    # TODO: fetch real game folder
+    return Path(r"C:\Users\wes\Desktop\Mod Swapper Test Folder\Baldurs Gate 3")
+
+def get_protected_paths() -> list[Path]:
+    game_folder = get_game_folder()
+    return [
+        game_folder / "Data" / "Mods" / "Shared",
+        game_folder / "Data" / "Mods" / "SharedDev",
+    ]
+
+def get_critical_game_paths() -> list[Path]:
+    game_folder = get_game_folder()
+    result = []
+    for path in CRITICAL_GAME_FOLDER_PATHS:
+        path = game_folder / path
+        result.append(path)
+    return result
+
+def get_test_folders() -> list[Path]:
+    test_folder_root = USER_DIR / "Desktop" / "Mod Swapper Test Folder"
+    return [
+        test_folder_root / "Data" / "Generated",
+        test_folder_root / "Data" / "Generated" / "Public" / "Shared" / "Assets" / "unique_tav",
+        test_folder_root / "Test Generated Folder",
+        test_folder_root / "modsettings.lsx",
+    ]
 
 @dataclass
 class UserSettings:
-    swap_paths: dict[str, Path] = field(default_factory=get_test_folders)
+    swap_paths: list[Path] = field(default_factory=get_test_folders)
+    protected_paths: list[Path] = field(default_factory=get_protected_paths)
+    critical_game_paths: list[Path] = field(default_factory=get_critical_game_paths)
+    game_folder: Path = field(default_factory=get_game_folder)
 
     def reset_to_defaults(self):
         # Wipes current settings and re-detects the game paths.
@@ -52,7 +79,7 @@ class UserSettings:
         USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         data = asdict(self)
         json_data = json.dumps(data, indent=4, default=str)
-        USER_SETTINGS_FILE.write_text(json_data, encoding="utf-8")
+        USER_SETTINGS_FILE.write_text(json_data, encoding="utf-8")      
 
     @classmethod
     def load_settings(cls) -> "UserSettings":
@@ -66,12 +93,12 @@ class UserSettings:
             allowed_keys = {f.name for f in cls.__dataclass_fields__.values() if f.init}
             filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
 
-            # Convert the dictionary of strings back into a dictionary of Paths
-            if "swap_paths" in filtered_data:
-                filtered_data["swap_paths"] = {
-                    name: Path(p) for name, p in filtered_data["swap_paths"].items()
-                }
-
+            # Convert the list of strings back into a list of Paths
+            for field in cls.__dataclass_fields__.values():
+                if field.init and field.name in filtered_data:
+                    filtered_data[field.name] = [
+                        Path(p) for p in filtered_data["swap_paths"].items()
+                    ]
             return cls(**filtered_data)
         
         except (json.JSONDecodeError, TypeError) as e:
@@ -79,3 +106,9 @@ class UserSettings:
             # fall back to a fresh default config.
             print(f"Warning: Failed to load config, using defaults. Error: {e}")
             return cls()
+        
+    def is_allowed_path(self, path: Path) -> bool:
+        return (
+            path in self.protected_paths or
+            path in self.critical_game_paths
+        )
