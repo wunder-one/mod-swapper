@@ -16,13 +16,11 @@ class ProfileState:
         # This list comprehension runs every time you access 'config.profiles'
         return {d.name: d for d in PROFILES_SNAPSHOT_DIR.iterdir() if d.is_dir()}
 
-    # Now your save_config only needs to worry about settings, not the disk state!
     def save_config(self):
         USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        
-        # We don't need asdict(self) anymore if we only have one setting
+
         data = {"active_profile": self.active_profile}
-        # The default=str handles Path objects automatically!
+        # The default=str handles Path objects automatically.
         json_data = json.dumps(data, indent=4, default=str)
         PROFILE_STATE_FILE.write_text(json_data, encoding="utf-8")
 

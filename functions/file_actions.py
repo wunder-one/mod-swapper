@@ -7,7 +7,7 @@ from user_settings import UserSettings
 from constants import PROFILES_SNAPSHOT_DIR
 
     
-def mirror_directory(source_dir: Path, dest_dir: Path, files: list[Path] = None):
+def mirror_directory(source_dir: Path, dest_dir: Path, files: list[Path] | None = None):
     command = [
         "robocopy",
         source_dir,
@@ -40,26 +40,26 @@ def get_unique_path(base_path: Path) -> Path:
             return new_path
         counter += 1
 
-def save_live_to_profile(profile_name: str, swap_paths: dict):
+def save_live_to_profile(profile_name: str, swap_paths: list):
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     profile_folder.mkdir(parents=True, exist_ok=True)
     for path in profile_folder.iterdir():
         if path.name not in swap_paths and path.is_dir():
             # TODO: Add in error handling for rmtree
             rmtree(path, ignore_errors=True)
-    # manifest_data = {"name of folder we are stashed away in": "folder the data came from"}
+    # manifest_data = {"name of storage folder": "folder the data came from"}
     manifest_data = {}
-    for live_path_name, live_path in swap_paths.items():
+    for live_path in swap_paths:
         live_path_folder = live_path if live_path.is_dir() else live_path.parent
-        live_filename = [live_path.name] if live_path.is_file() else None
-        storage_folder = profile_folder / live_path_name
-        mirror_directory(live_path_folder, storage_folder, live_filename)
+        live_filename_list = [live_path.name] if live_path.is_file() else None
+        storage_folder = profile_folder / live_path.name
+        mirror_directory(live_path_folder, storage_folder, live_filename_list)
         manifest_data[storage_folder.name] = str(live_path)
     json_data = json.dumps(manifest_data, indent=4, default=str)
     manifest_file = profile_folder / "manifest.json"
     manifest_file.write_text(json_data, encoding="utf-8")
 
-def load_profile_to_live(profile_name: str, swap_paths: Path):
+def load_profile_to_live(profile_name: str):
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     manifest_file = profile_folder / "manifest.json"
     if manifest_file.exists():
@@ -92,22 +92,20 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
 
     # Saving current profile
     old_profile = prof_state.active_profile
-    backup_created = False
     backup_profile = None
     if not old_profile:
         backup_profile = get_unique_path(PROFILES_SNAPSHOT_DIR / "Backed Up Profile")
         backup_profile.mkdir(parents=True, exist_ok=False)
         print(f"No active profile found. Backing up current live mods to '{backup_profile.name}'...")
-        save_live_to_profile(backup_profile.name, user_settings)
-        backup_created = True
+        save_live_to_profile(backup_profile.name, user_settings.swap_paths)
     else:
         print(f"Swapping from {prof_state.active_profile} to {profile_to_load}...")
-        save_live_to_profile(prof_state.active_profile, user_settings)
+        save_live_to_profile(prof_state.active_profile, user_settings.swap_paths)
         print(f"{prof_state.active_profile} saved to profile storage.")
 
     # Loading new profile
     try:
-        load_profile_to_live(profile_to_load, prof_state)
+        load_profile_to_live(profile_to_load)
         print(f"{profile_to_load} loaded to live mods.")
         prof_state.active_profile = profile_to_load
         prof_state.save_config()
@@ -116,8 +114,8 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
     except Exception as e:
         try:
             print("Loading failed, rolling back to old profile...")
-            rollback_profile = backup_profile.name if backup_created else old_profile
-            load_profile_to_live(rollback_profile, prof_state)
+            rollback_profile = backup_profile.name if backup_profile else old_profile
+            load_profile_to_live(rollback_profile)
             prof_state.active_profile = rollback_profile
             prof_state.save_config()
             print(f"Updated active profile to '{rollback_profile}' in config...")
@@ -131,6 +129,6 @@ def create_new_profile(profile_name: str, prof_state: ProfileState, user_setting
     unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
     unique_dir.mkdir(parents=True, exist_ok=False)
     profile_name = unique_dir.name
-    save_live_to_profile(profile_name, user_settings)
+    save_live_to_profile(profile_name, user_settings.swap_paths)
     prof_state.active_profile = profile_name
     prof_state.save_config()

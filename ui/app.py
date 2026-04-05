@@ -81,7 +81,7 @@ class ProfileFrame(customtkinter.CTkFrame):
         except Exception as e:
             print(f"Error swapping profiles: {e}")
         # Always update the UI frames to reflect the current state
-        self.master.update_profile_frames()
+        self.master.update_profile_frames() # type: ignore
 
     def set_active_appearance(self, is_active: bool):
         if is_active:
@@ -105,7 +105,7 @@ class ButtonBar(customtkinter.CTkFrame):
         self.overwrite_button = customtkinter.CTkButton(self, text="Overwrite Profile", command=self.new_profile_callback, width=100)
         self.overwrite_button.grid(row=0, column=1, padx=(6, 0), pady=6)
 
-        self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self.master.refresh_profiles, width=100)
+        self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self.master.refresh_profiles, width=100)  # type: ignore
         self.settings_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
 
     def new_profile_callback(self):
@@ -116,4 +116,4 @@ class ButtonBar(customtkinter.CTkFrame):
             return
         print("Name:", new_name)
         create_new_profile(new_name, self.prof_state, self.user_settings)
-        self.master.refresh_profiles()
+        self.master.refresh_profiles()  # type: ignore

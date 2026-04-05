@@ -2,8 +2,10 @@ import json
 import os
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, LOCAL_APPDATA, USER_DIR, CRITICAL_GAME_FOLDER_PATHS
+from typing import Literal
 
+from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, LOCAL_APPDATA, USER_DIR, CRITICAL_GAME_FOLDER_PATHS, DEFAULT_STEAM_GAME_FOLDER, DEFAULT_GOG_GAME_FOLDER
+from functions.discover_steam import find_game_install_path
 
 '''
 # Future factory fuction for defaults file paths
@@ -30,61 +32,88 @@ def get_bg3_defaults() -> dict[str, Path]:
         "GameData": game_data
     }
 '''
-#     "Data" / "Mods" / "Shared",
-#     "Data" / "Mods" / "SharedDev",
 
-def get_game_folder():
-    # TODO: Logic for getting the game folder
-    # TODO: fetch real game folder
-    return Path(r"C:\Users\wes\Desktop\Mod Swapper Test Folder\Baldurs Gate 3")
+# determine if the game is from Steam or GOG
+InstallType = Literal["steam", "gog", "custom"]
 
-def get_protected_paths() -> list[Path]:
-    game_folder = get_game_folder()
+def get_game_install_type() -> InstallType:
+    # TODO: logic that determines install type goes here
+    # Setting game type to steam for testing
+    return "steam"
+
+def get_default_game_folder() -> Path:
+    install_type = get_game_install_type()
+    if install_type == "steam":
+        game_folder = DEFAULT_STEAM_GAME_FOLDER
+    if install_type == "gog":
+        game_folder = DEFAULT_GOG_GAME_FOLDER
+    else:
+        raise ValueError(f"Cannot provide default folder path without install type")
+    if not game_folder.exists():
+        raise FileNotFoundError(f"Game folder not found at {game_folder}. Please check the path and try again.")
+    return game_folder
+
+def get_swap_folder_defaults(game_folder: Path) -> list[Path]:
+    if not game_folder:
+        return []
+    test_folder_root = USER_DIR / "Desktop" / "Mod Swapper Test Folder"
+    return [
+        game_folder / "Data" / "Generated",
+        game_folder / "Data" / "Generated" / "Public" / "Shared" / "Assets" / "unique_tav",
+        test_folder_root / "Test Generated Folder",
+        test_folder_root / "modsettings.lsx",
+    ]
+
+def get_protected_path_defaults(game_folder: Path) -> list[Path]:
+    if not game_folder:
+        return []
     return [
         game_folder / "Data" / "Mods" / "Shared",
         game_folder / "Data" / "Mods" / "SharedDev",
     ]
 
-def get_critical_game_paths() -> list[Path]:
-    game_folder = get_game_folder()
+def get_critical_game_paths(game_folder: Path) -> list[Path]:
     result = []
+    if not game_folder:
+        return result
     for path in CRITICAL_GAME_FOLDER_PATHS:
         path = game_folder / path
         result.append(path)
     return result
 
-def get_test_folders() -> list[Path]:
-    test_folder_root = USER_DIR / "Desktop" / "Mod Swapper Test Folder"
-    return [
-        test_folder_root / "Data" / "Generated",
-        test_folder_root / "Data" / "Generated" / "Public" / "Shared" / "Assets" / "unique_tav",
-        test_folder_root / "Test Generated Folder",
-        test_folder_root / "modsettings.lsx",
-    ]
-
 @dataclass
-class UserSettings:
-    swap_paths: list[Path] = field(default_factory=get_test_folders)
-    protected_paths: list[Path] = field(default_factory=get_protected_paths)
-    critical_game_paths: list[Path] = field(default_factory=get_critical_game_paths)
-    game_folder: Path = field(default_factory=get_game_folder)
+class UserSettings():
+    game_folder: Path
+    swap_paths: list[Path]
+    protected_paths: list[Path]
+    critical_game_paths: list[Path]
 
     def reset_to_defaults(self):
         # Wipes current settings and re-detects the game paths.
-        self.swap_paths = get_test_folders()
-        # You might want to auto-save after a reset
+        game_folder = get_default_game_folder()
+        self.game_folder = game_folder
+        self.swap_paths = get_swap_folder_defaults(game_folder)
+        self.protected_paths = get_protected_path_defaults(game_folder)
+        self.critical_game_paths = get_critical_game_paths(game_folder)
+        # Save to disk again
         self.save_settings()
 
-    def save_settings(self):
-        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        data = asdict(self)
-        json_data = json.dumps(data, indent=4, default=str)
-        USER_SETTINGS_FILE.write_text(json_data, encoding="utf-8")      
+    @classmethod
+    def create_with_defaults(cls) -> "UserSettings":
+        game_folder = get_default_game_folder()
+        return cls(
+            game_folder=game_folder,
+            swap_paths=get_swap_folder_defaults(game_folder),
+            protected_paths=get_protected_path_defaults(game_folder),
+            critical_game_paths=get_critical_game_paths(game_folder),
+        )
 
     @classmethod
     def load_settings(cls) -> "UserSettings":
+        # If no user settings file, load defaults
         if not USER_SETTINGS_FILE.exists():
-            return cls()
+            return cls.create_with_defaults()
+        # If there is a user settings file, load it 
         try:
             with USER_SETTINGS_FILE.open("r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -105,7 +134,13 @@ class UserSettings:
             # If the file is garbled or missing required fields, 
             # fall back to a fresh default config.
             print(f"Warning: Failed to load config, using defaults. Error: {e}")
-            return cls()
+            return cls.create_with_defaults()
+        
+    def save_settings(self):
+        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        data = asdict(self)
+        json_data = json.dumps(data, indent=4, default=str)
+        USER_SETTINGS_FILE.write_text(json_data, encoding="utf-8")     
         
     def is_allowed_path(self, path: Path) -> bool:
         return (
