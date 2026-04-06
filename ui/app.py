@@ -114,6 +114,8 @@ class ButtonBar(customtkinter.CTkFrame):
         if new_name is None or new_name.strip() == "":
             print("Profile creation cancelled or invalid name entered.")
             return
-        print("Name:", new_name)
-        create_new_profile(new_name, self.prof_state, self.user_settings)
+        print("Input Name:", new_name)
+        set_name = create_new_profile(new_name.strip(), self.prof_state, self.user_settings)
         self.master.refresh_profiles()  # type: ignore
+        print("Created Name:", set_name)
+        

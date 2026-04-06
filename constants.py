@@ -15,18 +15,13 @@ DEFAULT_GOG_GAME_FOLDER = Path("")
 
 # TODO: map to real files. 
 CRITICAL_GAME_FOLDER_PATHS = [
-    Path("Data") / "Mods" / "Gustav",
-    Path("Data") / "Mods" / "GustavDev",
-    Path("Data") / "Mods" / "GustavX",
-    Path("Data") / "Generated" / "Public" / "Engine",
-    Path("Data") / "Generated" / "Public" / "Game",
-    Path("DigitalDeluxe"),
-    Path("DotNetCore"),
-    Path("Launcher"),
+    Path("Data/Generated/Public/Engine"),
+    Path("Data/Generated/Public/Game"),
+    Path("Data/bin/db")
 ]
-IGNORED_FILEPATH_PATTERNS = [
-    "exe",
-    "dmp",
-    "mods",
-    "dll",
+
+PROTECTED_PATTERNS = [
+    "*.exe",
+    "*.dmp",
+    "*.log",
 ]

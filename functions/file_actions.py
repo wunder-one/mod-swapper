@@ -2,21 +2,32 @@ import subprocess
 import json
 from pathlib import Path
 from shutil import rmtree
+
 from profile_state import ProfileState
 from user_settings import UserSettings
-from constants import PROFILES_SNAPSHOT_DIR
+from constants import PROFILES_SNAPSHOT_DIR, USER_DIR
 
-    
-def mirror_directory(source_dir: Path, dest_dir: Path, files: list[Path] | None = None):
+
+def mirror_directory(
+        source_dir: Path, 
+        dest_dir: Path, 
+        files: list[str] | None = None, 
+        exclude_files: list[Path] | None = None, 
+        exclude_dirs: list[Path] | None = None,
+):
     command = [
         "robocopy",
-        source_dir,
-        dest_dir,
+        str(source_dir),
+        str(dest_dir),
     ]
-
     if files:
         command.extend(files)
-    
+    if exclude_files:
+        command.append("/XF")
+        command.extend(str(f) for f in exclude_files)
+    if exclude_dirs:
+        command.append("/XD")
+        command.extend(str(f) for f in exclude_dirs)
     command.extend([
         "/MIR",   # mirror
         "/FFT",   # use FAT file times (2-second tolerance, more reliable)
@@ -26,7 +37,7 @@ def mirror_directory(source_dir: Path, dest_dir: Path, files: list[Path] | None 
     result = subprocess.run(command, capture_output=True, text=True)
     # Robocopy exit codes 0-7 are success, 8+ are errors
     if result.returncode >= 8:
-        raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stdout}")
+        raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stderr}\n{result.stdout}")
 
 def get_unique_path(base_path: Path) -> Path:
     # Returns a Path that doesn't exist by appending (n) if necessary.
@@ -40,26 +51,40 @@ def get_unique_path(base_path: Path) -> Path:
             return new_path
         counter += 1
 
-def save_live_to_profile(profile_name: str, swap_paths: list):
+def save_live_to_profile(profile_name: str, user_settings: UserSettings):
+    # Create profile folder if needed
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     profile_folder.mkdir(parents=True, exist_ok=True)
+    # Move "extra" folders to desktop 
+    recovery_folder_created = False
     for path in profile_folder.iterdir():
-        if path.name not in swap_paths and path.is_dir():
-            # TODO: Add in error handling for rmtree
-            rmtree(path, ignore_errors=True)
+        if path.name not in user_settings.swap_paths and path.is_dir():
+            if not recovery_folder_created:
+                recovery_folder = get_unique_path(USER_DIR / "Desktop" / "BG3 Mod Swapper Recovered Files" / profile_name)
+                recovery_folder_created = True
+            path.move(recovery_folder)
     # manifest_data = {"name of storage folder": "folder the data came from"}
     manifest_data = {}
-    for live_path in swap_paths:
+    # Mirror each swap folder 
+    for live_path in user_settings.swap_paths:
         live_path_folder = live_path if live_path.is_dir() else live_path.parent
         live_filename_list = [live_path.name] if live_path.is_file() else None
         storage_folder = profile_folder / live_path.name
-        mirror_directory(live_path_folder, storage_folder, live_filename_list)
-        manifest_data[storage_folder.name] = str(live_path)
+        excluded_files, excluded_dirs = user_settings.get_protected_paths()
+        mirror_directory(
+            live_path_folder, 
+            storage_folder, 
+            files=live_filename_list,
+            exclude_files=excluded_files, 
+            exclude_dirs=excluded_dirs,
+        )
+        manifest_data[storage_folder.name] = str(live_path_folder)
     json_data = json.dumps(manifest_data, indent=4, default=str)
     manifest_file = profile_folder / "manifest.json"
     manifest_file.write_text(json_data, encoding="utf-8")
 
-def load_profile_to_live(profile_name: str):
+def load_profile_to_live(profile_name: str, user_settings: UserSettings):
+    print(f"Running load_profile_to_live for {profile_name}")
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     manifest_file = profile_folder / "manifest.json"
     if manifest_file.exists():
@@ -68,14 +93,18 @@ def load_profile_to_live(profile_name: str):
         for storage_folder_str, live_path_str in manifest["paths"].items():
             storage_path = Path(storage_folder_str)
             live_path = Path(live_path_str)
-
     else:   # if we don't have a manifest
         pass    # check if swap_paths exsist in live, or should we throw an error?
 
-    
     # Now move source_path -> target_path
     print(f"Restoring {storage_path.name} to {live_path.name}...")
-    mirror_directory(storage_path, live_path)
+    excluded_files, excluded_dirs = user_settings.get_protected_paths()
+    mirror_directory(
+        storage_path, 
+        live_path, 
+        exclude_files=excluded_files, 
+        exclude_dirs=excluded_dirs,
+    )
 
 def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings: UserSettings):
     # Validations
@@ -94,18 +123,18 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
     old_profile = prof_state.active_profile
     backup_profile = None
     if not old_profile:
-        backup_profile = get_unique_path(PROFILES_SNAPSHOT_DIR / "Backed Up Profile")
-        backup_profile.mkdir(parents=True, exist_ok=False)
-        print(f"No active profile found. Backing up current live mods to '{backup_profile.name}'...")
-        save_live_to_profile(backup_profile.name, user_settings.swap_paths)
+        print("No active profile found. Backing up current live mods...")
+        backup_profile = create_new_profile("Backup Profile", prof_state, user_settings)
+        print(f"New backup profile: {backup_profile}")
+        old_profile = backup_profile
     else:
         print(f"Swapping from {prof_state.active_profile} to {profile_to_load}...")
-        save_live_to_profile(prof_state.active_profile, user_settings.swap_paths)
+        save_live_to_profile(prof_state.active_profile, user_settings)
         print(f"{prof_state.active_profile} saved to profile storage.")
 
     # Loading new profile
     try:
-        load_profile_to_live(profile_to_load)
+        load_profile_to_live(profile_to_load, user_settings)
         print(f"{profile_to_load} loaded to live mods.")
         prof_state.active_profile = profile_to_load
         prof_state.save_config()
@@ -114,9 +143,12 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
     except Exception as e:
         try:
             print("Loading failed, rolling back to old profile...")
-            rollback_profile = backup_profile.name if backup_profile else old_profile
-            load_profile_to_live(rollback_profile)
+            rollback_profile = backup_profile or old_profile
+            print(f"Loading {rollback_profile} to Live")
+            load_profile_to_live(rollback_profile, user_settings)
+            print("Profile loaded. Updating active profile in memory...")
             prof_state.active_profile = rollback_profile
+            print("Active Profiles Saved. Saving updated state to disk...")
             prof_state.save_config()
             print(f"Updated active profile to '{rollback_profile}' in config...")
         except Exception as rollback_error:
@@ -125,10 +157,11 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
         raise RuntimeError(f"Failed to load profile '{profile_to_load}'. Rolled back.") from e
 
 
-def create_new_profile(profile_name: str, prof_state: ProfileState, user_settings: UserSettings):
+def create_new_profile(profile_name: str, prof_state: ProfileState, user_settings: UserSettings) -> str:
     unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
     unique_dir.mkdir(parents=True, exist_ok=False)
     profile_name = unique_dir.name
-    save_live_to_profile(profile_name, user_settings.swap_paths)
+    save_live_to_profile(profile_name, user_settings)
     prof_state.active_profile = profile_name
     prof_state.save_config()
+    return profile_name
