@@ -1,7 +1,7 @@
 import subprocess
 import json
 from pathlib import Path
-from shutil import rmtree
+from shutil import move, rmtree
 
 from profile_state import ProfileState
 from user_settings import UserSettings
@@ -35,6 +35,7 @@ def mirror_directory(
         "/NP",    # no progress percentage in output
     ])
     result = subprocess.run(command, capture_output=True, text=True)
+    # print(f"Robocopy ran with no errors => exit code {result.returncode}\n{result.stdout}")
     # Robocopy exit codes 0-7 are success, 8+ are errors
     if result.returncode >= 8:
         raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stderr}\n{result.stdout}")
@@ -57,54 +58,61 @@ def save_live_to_profile(profile_name: str, user_settings: UserSettings):
     profile_folder.mkdir(parents=True, exist_ok=True)
     # Move "extra" folders to desktop 
     recovery_folder_created = False
+    swap_folder_names = [p.name for p in user_settings.swap_paths]
     for path in profile_folder.iterdir():
-        if path.name not in user_settings.swap_paths and path.is_dir():
+        if path.name not in swap_folder_names and path.is_dir():
             if not recovery_folder_created:
                 recovery_folder = get_unique_path(USER_DIR / "Desktop" / "BG3 Mod Swapper Recovered Files" / profile_name)
+                recovery_folder.mkdir(parents=True, exist_ok=True)
                 recovery_folder_created = True
-            path.move(recovery_folder)
+            move(path, recovery_folder)
     # manifest_data = {"name of storage folder": "folder the data came from"}
-    manifest_data = {}
+    manifest_data = {"version": 1, "targets": []}
     # Mirror each swap folder 
     for live_path in user_settings.swap_paths:
-        live_path_folder = live_path if live_path.is_dir() else live_path.parent
-        live_filename_list = [live_path.name] if live_path.is_file() else None
         storage_folder = profile_folder / live_path.name
+        storage_folder.mkdir(parents=True, exist_ok=True)
         excluded_files, excluded_dirs = user_settings.get_protected_paths()
-        mirror_directory(
-            live_path_folder, 
-            storage_folder, 
-            files=live_filename_list,
-            exclude_files=excluded_files, 
-            exclude_dirs=excluded_dirs,
-        )
-        manifest_data[storage_folder.name] = str(live_path_folder)
+        if live_path.is_dir():
+            mirror_directory(
+                live_path, 
+                storage_folder,
+                exclude_files=excluded_files, 
+                exclude_dirs=excluded_dirs,
+            )
+            manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_folder), "type": "directory" })
+        if live_path.is_file():
+            # TODO write copy_file fuction
+            copy_file(live_path, storage_folder)
+            # Need to consider if file source should be parent folder or file path.
+            manifest_data["targets"].append({ "source": str(live_path.parent), "storage": str(storage_folder), "type": "file" })
+        
     json_data = json.dumps(manifest_data, indent=4, default=str)
     manifest_file = profile_folder / "manifest.json"
     manifest_file.write_text(json_data, encoding="utf-8")
 
+# TODO: Update with new manifest json format
 def load_profile_to_live(profile_name: str, user_settings: UserSettings):
     print(f"Running load_profile_to_live for {profile_name}")
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     manifest_file = profile_folder / "manifest.json"
-    if manifest_file.exists():
-        with manifest_file.open("r") as f:
-            manifest = json.load(f)
-        for storage_folder_str, live_path_str in manifest["paths"].items():
-            storage_path = Path(storage_folder_str)
-            live_path = Path(live_path_str)
-    else:   # if we don't have a manifest
-        pass    # check if swap_paths exsist in live, or should we throw an error?
+    if not manifest_file.exists():
+        raise FileNotFoundError(f"Manifest not found for profile '{profile_name}'")
 
-    # Now move source_path -> target_path
-    print(f"Restoring {storage_path.name} to {live_path.name}...")
+    with manifest_file.open("r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
     excluded_files, excluded_dirs = user_settings.get_protected_paths()
-    mirror_directory(
-        storage_path, 
-        live_path, 
-        exclude_files=excluded_files, 
-        exclude_dirs=excluded_dirs,
-    )
+    for storage_folder_name, live_path_str in manifest.get("targets", {}).items():
+        storage_path = profile_folder / storage_folder_name
+        live_path = Path(live_path_str)
+        print(f"Restoring {storage_path.name} to {live_path.name}...")
+        mirror_directory(
+            storage_path,
+            live_path,
+            exclude_files=excluded_files,
+            exclude_dirs=excluded_dirs,
+        )
 
 def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings: UserSettings):
     # Validations
