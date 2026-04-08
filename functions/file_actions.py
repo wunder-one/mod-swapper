@@ -1,7 +1,7 @@
 import subprocess
 import json
 from pathlib import Path
-from shutil import move, rmtree
+from shutil import move, rmtree, copy2
 
 from profile_state import ProfileState
 from user_settings import UserSettings
@@ -11,8 +11,7 @@ from constants import PROFILES_SNAPSHOT_DIR, USER_DIR
 def mirror_directory(
         source_dir: Path, 
         dest_dir: Path, 
-        files: list[str] | None = None, 
-        exclude_files: list[Path] | None = None, 
+        excluded_files: list[Path] | None = None,
         exclude_dirs: list[Path] | None = None,
 ):
     command = [
@@ -20,11 +19,9 @@ def mirror_directory(
         str(source_dir),
         str(dest_dir),
     ]
-    if files:
-        command.extend(files)
-    if exclude_files:
+    if excluded_files:
         command.append("/XF")
-        command.extend(str(f) for f in exclude_files)
+        command.extend(str(f) for f in excluded_files)
     if exclude_dirs:
         command.append("/XD")
         command.extend(str(f) for f in exclude_dirs)
@@ -35,10 +32,17 @@ def mirror_directory(
         "/NP",    # no progress percentage in output
     ])
     result = subprocess.run(command, capture_output=True, text=True)
-    # print(f"Robocopy ran with no errors => exit code {result.returncode}\n{result.stdout}")
     # Robocopy exit codes 0-7 are success, 8+ are errors
     if result.returncode >= 8:
         raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stderr}\n{result.stdout}")
+
+def copy_file(src_file: Path, dst: Path, excluded_files: list[Path] | None = None):
+    dst_file = dst if dst.is_file() else dst / src_file.name
+    if excluded_files and dst_file in excluded_files:
+        raise ValueError("Specified destination is protected")    
+    if excluded_files and src_file in excluded_files:
+        raise ValueError("Specified destination is protected")
+    src_file.copy(dst_file, follow_symlinks=False, preserve_metadata=True)
 
 def get_unique_path(base_path: Path) -> Path:
     # Returns a Path that doesn't exist by appending (n) if necessary.
@@ -77,7 +81,7 @@ def save_live_to_profile(profile_name: str, user_settings: UserSettings):
             mirror_directory(
                 live_path, 
                 storage_folder,
-                exclude_files=excluded_files, 
+                excluded_files=excluded_files, 
                 exclude_dirs=excluded_dirs,
             )
             manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_folder), "type": "directory" })
@@ -110,7 +114,7 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
         mirror_directory(
             storage_path,
             live_path,
-            exclude_files=excluded_files,
+            excluded_files=excluded_files,
             exclude_dirs=excluded_dirs,
         )
 
@@ -139,6 +143,8 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
         print(f"Swapping from {prof_state.active_profile} to {profile_to_load}...")
         save_live_to_profile(prof_state.active_profile, user_settings)
         print(f"{prof_state.active_profile} saved to profile storage.")
+
+    # TODO: cleanup single files not in incomming profile
 
     # Loading new profile
     try:

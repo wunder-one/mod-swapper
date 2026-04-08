@@ -11,10 +11,10 @@ def test():
 
     user_settings = UserSettings.load_settings()
 
-    save_live_to_profile(args.profile_name, user_settings.swap_paths)
+    save_live_to_profile(args.profile_name, user_settings)
     print(f"==> Saved live mods from:")
-    for k, v in user_settings.swap_paths.items():
-        print(f"- {k} Folder at {v}")
+    for p in user_settings.swap_paths:
+        print(f"- Copied {p}")
     print(f"  >to profile '{args.profile_name}'")
     print('------ END OF TEST ------')
     print('')
