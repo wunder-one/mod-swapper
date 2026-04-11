@@ -36,7 +36,7 @@ def mirror_directory(
     if result.returncode >= 8:
         raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stderr}\n{result.stdout}")
 
-def copy_file(src_file: Path, dst: Path, excluded_files: list[Path] | None = None):
+def copy_file(src_file: Path, dst: Path, excluded_files: list[Path] | None):
     dst_file = dst if dst.is_file() else dst / src_file.name
     if excluded_files and dst_file in excluded_files:
         raise ValueError("Specified destination is protected")    
@@ -86,8 +86,7 @@ def save_live_to_profile(profile_name: str, user_settings: UserSettings):
             )
             manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_folder), "type": "directory" })
         if live_path.is_file():
-            # TODO write copy_file fuction
-            copy_file(live_path, storage_folder)
+            copy_file(live_path, storage_folder, excluded_files)
             # Need to consider if file source should be parent folder or file path.
             manifest_data["targets"].append({ "source": str(live_path.parent), "storage": str(storage_folder), "type": "file" })
         
@@ -107,16 +106,20 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
         manifest = json.load(f)
 
     excluded_files, excluded_dirs = user_settings.get_protected_paths()
-    for storage_folder_name, live_path_str in manifest.get("targets", {}).items():
-        storage_path = profile_folder / storage_folder_name
-        live_path = Path(live_path_str)
-        print(f"Restoring {storage_path.name} to {live_path.name}...")
-        mirror_directory(
-            storage_path,
-            live_path,
-            excluded_files=excluded_files,
-            exclude_dirs=excluded_dirs,
-        )
+    for target in manifest.get("targets", []):
+        storage_path = profile_folder / target["storage"]
+        dst_path = Path(target["source"])
+        if target["type"] == "directory":
+            print(f"Restoring {storage_path.name} directory to {dst_path.name}...")
+            mirror_directory(
+                storage_path,
+                dst_path,
+                excluded_files=excluded_files,
+                exclude_dirs=excluded_dirs,
+            )
+        if target["type"] == "file":
+            print(f"Restoring {storage_path.name} file to {dst_path.parent.name}...")
+            copy_file(storage_path / dst_path.name, dst_path, excluded_files)
 
 def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings: UserSettings):
     # Validations
