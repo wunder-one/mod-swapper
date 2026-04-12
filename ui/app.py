@@ -1,4 +1,6 @@
 import customtkinter
+
+from ui.settings import SettingsWindow
 from profile_state import ProfileState
 from user_settings import UserSettings
 from functions.file_actions import swap_profiles, create_new_profile
@@ -21,6 +23,8 @@ class App(customtkinter.CTk):
         self.button_bar.grid(row=0, column=0, pady=(0, 0), columnspan=3, sticky="ew")
         self.button_bar.configure(corner_radius=0)
         self.create_profile_frames()
+        
+        self.settings_window: SettingsWindow | None = None
 
     def create_profile_frames(self):
         self.profile_list = list(self.prof_state.profiles.keys())
@@ -45,6 +49,14 @@ class App(customtkinter.CTk):
             frame.destroy()
         self.profile_frames.clear()
         self.create_profile_frames()
+
+    def open_settings_window(self):
+        if self.settings_window is None or not self.settings_window.winfo_exists():
+            window = SettingsWindow(self)
+            self.settings_window = window
+            window.bind('<Map>', lambda event: window.focus())
+        else:
+            self.settings_window.focus()
 
     # ----- Full width button for later -----
     # def button_callback(self):
@@ -105,8 +117,9 @@ class ButtonBar(customtkinter.CTkFrame):
         self.overwrite_button = customtkinter.CTkButton(self, text="Overwrite Profile", command=self.new_profile_callback, width=100)
         self.overwrite_button.grid(row=0, column=1, padx=(6, 0), pady=6)
 
-        self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self.master.refresh_profiles, width=100)  # type: ignore
+        self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self.master.open_settings_window, width=100)  # type: ignore
         self.settings_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
+
 
     def new_profile_callback(self):
         new_profile_dialog = customtkinter.CTkInputDialog(text="This will create a new profile from your currently active mods.\n\nProfile Name:", title="New Profile")

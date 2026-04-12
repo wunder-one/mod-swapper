@@ -12,7 +12,7 @@ from functions.discover_steam import find_game_install_path
 # determine if the game is from Steam or GOG
 InstallType = Literal["steam", "gog", "custom"]
 
-def get_game_install_type():
+def get_game_install_type() -> InstallType:
     # TODO: logic that determines install type goes here
     # Setting game type to steam for testing
     return "steam"
