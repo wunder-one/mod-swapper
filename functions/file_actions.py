@@ -77,26 +77,43 @@ def save_live_to_profile(profile_name: str, user_settings: UserSettings):
     manifest_data = {"version": 1, "targets": []}
     # Mirror each swap folder 
     for live_path in user_settings.swap_paths:
-        storage_folder = profile_folder / live_path.name
-        storage_folder.mkdir(parents=True, exist_ok=True)
-        excluded_files, excluded_dirs = user_settings.get_protected_paths()
-        if live_path.is_dir():
-            mirror_directory(
-                live_path, 
-                storage_folder,
-                excluded_files=excluded_files, 
-                exclude_dirs=excluded_dirs,
-            )
-            manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_folder), "type": "directory" })
-        if live_path.is_file():
-            storage_file_path = storage_folder / live_path.name
-            copy_file(live_path, storage_file_path, excluded_files)
-            # Need to consider if file source should be parent folder or file path.
-            manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_file_path), "type": "file" })
+        if live_path.exists():
+            storage_folder = profile_folder / live_path.name
+            storage_folder.mkdir(parents=True, exist_ok=True)
+            excluded_files, excluded_dirs = user_settings.get_protected_paths()
+            if live_path.is_dir():
+                mirror_directory(
+                    live_path, 
+                    storage_folder,
+                    excluded_files=excluded_files, 
+                    exclude_dirs=excluded_dirs,
+                )
+                manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_folder), "type": "directory" })
+            if live_path.is_file():
+                storage_file_path = storage_folder / live_path.name
+                copy_file(live_path, storage_file_path, excluded_files)
+                # Need to consider if file source should be parent folder or file path.
+                manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_file_path), "type": "file" })
         
     json_data = json.dumps(manifest_data, indent=4, default=str)
     manifest_file = profile_folder / "manifest.json"
     manifest_file.write_text(json_data, encoding="utf-8")
+
+def remove_single_files(outgoing_profile: str, incoming_profile: str):
+    outgoing_manifest_file = PROFILES_SNAPSHOT_DIR / outgoing_profile / "manifest.json"
+    with outgoing_manifest_file.open("r", encoding="utf-8") as f:
+        outgoing_manifest = json.load(f)
+    incoming_manifest_file = PROFILES_SNAPSHOT_DIR / incoming_profile / "manifest.json"
+    with incoming_manifest_file.open("r", encoding="utf-8") as f:
+        incoming_manifest = json.load(f)
+
+    incoming_sources = {t["source"] for t in incoming_manifest["targets"] if t["type"] == "file"}
+    for target in outgoing_manifest.get("targets"):
+        if target["type"] == "file" and target["source"] not in incoming_sources:
+            print("Converting to Path")
+            p = Path(target["source"])
+            print(f"Deleting {p.name}")
+            p.unlink(missing_ok=True)
 
 def load_profile_to_live(profile_name: str, user_settings: UserSettings):
     print(f"Running load_profile_to_live for {profile_name}")
@@ -126,6 +143,15 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
             print(f"Restoring {storage_path.name} file to {dst_path.name}...")
             copy_file(storage_path, dst_path, excluded_files)
 
+def create_new_profile(profile_name: str, prof_state: ProfileState, user_settings: UserSettings) -> str:
+    unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
+    unique_dir.mkdir(parents=True, exist_ok=False)
+    profile_name = unique_dir.name
+    save_live_to_profile(profile_name, user_settings)
+    prof_state.active_profile = profile_name
+    prof_state.save_config()
+    return profile_name
+
 def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings: UserSettings):
     # Validations
     # Check if the selected profile is already active
@@ -152,7 +178,7 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
         save_live_to_profile(prof_state.active_profile, user_settings)
         print(f"{prof_state.active_profile} saved to profile storage.")
 
-    # TODO: cleanup single files not in incomming profile
+    remove_single_files(old_profile, profile_to_load)
 
     # Loading new profile
     try:
@@ -180,11 +206,4 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
         raise RuntimeError(f"Failed to load profile '{profile_to_load}'. Rolled back.") from e
 
 
-def create_new_profile(profile_name: str, prof_state: ProfileState, user_settings: UserSettings) -> str:
-    unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
-    unique_dir.mkdir(parents=True, exist_ok=False)
-    profile_name = unique_dir.name
-    save_live_to_profile(profile_name, user_settings)
-    prof_state.active_profile = profile_name
-    prof_state.save_config()
-    return profile_name
+
