@@ -17,7 +17,7 @@ DEFAULT_GOG_GAME_FOLDER = Path("")
 CRITICAL_GAME_FOLDER_PATHS = [
     Path("Data/Generated/Public/Engine"),
     Path("Data/Generated/Public/Game"),
-    Path("Data/bin/db")
+    Path("Data/bin/db"),
 ]
 
 PROTECTED_PATTERNS = [

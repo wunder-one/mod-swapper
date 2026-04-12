@@ -13,7 +13,8 @@ def mirror_directory(
         dest_dir: Path, 
         excluded_files: list[Path] | None = None,
         exclude_dirs: list[Path] | None = None,
-):
+    ):
+    print(f"- Mirror Directory {source_dir.name} => {dest_dir.name}")
     command = [
         "robocopy",
         str(source_dir),
@@ -31,17 +32,19 @@ def mirror_directory(
         "/Z",     # restartable mode in case of interruption
         "/NP",    # no progress percentage in output
     ])
+    # print(f"--> {source_dir}(file) --> {dest_dir}")
     result = subprocess.run(command, capture_output=True, text=True)
     # Robocopy exit codes 0-7 are success, 8+ are errors
     if result.returncode >= 8:
         raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stderr}\n{result.stdout}")
 
-def copy_file(src_file: Path, dst: Path, excluded_files: list[Path] | None):
-    dst_file = dst if dst.is_file() else dst / src_file.name
+def copy_file(src_file: Path, dst_file: Path, excluded_files: list[Path] | None):
+    print(f"- Copy File {src_file.name} => {dst_file.name}")
     if excluded_files and dst_file in excluded_files:
         raise ValueError("Specified destination is protected")    
     if excluded_files and src_file in excluded_files:
-        raise ValueError("Specified destination is protected")
+        raise ValueError("Specified source file is protected")
+    # print(f"--> {src_file}(file) --> {dst_file}")
     src_file.copy(dst_file, follow_symlinks=False, preserve_metadata=True)
 
 def get_unique_path(base_path: Path) -> Path:
@@ -86,18 +89,20 @@ def save_live_to_profile(profile_name: str, user_settings: UserSettings):
             )
             manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_folder), "type": "directory" })
         if live_path.is_file():
-            copy_file(live_path, storage_folder, excluded_files)
+            storage_file_path = storage_folder / live_path.name
+            copy_file(live_path, storage_file_path, excluded_files)
             # Need to consider if file source should be parent folder or file path.
-            manifest_data["targets"].append({ "source": str(live_path.parent), "storage": str(storage_folder), "type": "file" })
+            manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_file_path), "type": "file" })
         
     json_data = json.dumps(manifest_data, indent=4, default=str)
     manifest_file = profile_folder / "manifest.json"
     manifest_file.write_text(json_data, encoding="utf-8")
 
-# TODO: Update with new manifest json format
 def load_profile_to_live(profile_name: str, user_settings: UserSettings):
     print(f"Running load_profile_to_live for {profile_name}")
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
+    if not profile_folder.exists():
+        raise FileNotFoundError(f"No profile folder found for '{profile_name}'")
     manifest_file = profile_folder / "manifest.json"
     if not manifest_file.exists():
         raise FileNotFoundError(f"Manifest not found for profile '{profile_name}'")
@@ -107,7 +112,7 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
 
     excluded_files, excluded_dirs = user_settings.get_protected_paths()
     for target in manifest.get("targets", []):
-        storage_path = profile_folder / target["storage"]
+        storage_path = Path(target["storage"])
         dst_path = Path(target["source"])
         if target["type"] == "directory":
             print(f"Restoring {storage_path.name} directory to {dst_path.name}...")
@@ -118,8 +123,8 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
                 exclude_dirs=excluded_dirs,
             )
         if target["type"] == "file":
-            print(f"Restoring {storage_path.name} file to {dst_path.parent.name}...")
-            copy_file(storage_path / dst_path.name, dst_path, excluded_files)
+            print(f"Restoring {storage_path.name} file to {dst_path.name}...")
+            copy_file(storage_path, dst_path, excluded_files)
 
 def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings: UserSettings):
     # Validations
@@ -155,7 +160,8 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
         print(f"{profile_to_load} loaded to live mods.")
         prof_state.active_profile = profile_to_load
         prof_state.save_config()
-        print(f"Updated active profile to '{profile_to_load}' in config...")
+        print(f"[SUCCESS] Updated active profile to '{profile_to_load}' in config...")
+        print("------ END OF SWAP ------")
         return prof_state.active_profile   
     except Exception as e:
         try:
@@ -167,7 +173,7 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
             prof_state.active_profile = rollback_profile
             print("Active Profiles Saved. Saving updated state to disk...")
             prof_state.save_config()
-            print(f"Updated active profile to '{rollback_profile}' in config...")
+            print(f"[RESTORE] Updated active profile to '{rollback_profile}' in config...")
         except Exception as rollback_error:
             print(f"Rollback failed: {rollback_error}")
             raise RuntimeError("Critical error: Failed to load new profile and rollback also failed. Live mods may be in an inconsistent state.") from rollback_error

@@ -37,7 +37,7 @@ def get_swap_folder_defaults(game_folder: Path) -> list[Path]:
     return [
         game_folder / "bin" / "NativeMods",
         game_folder / "Data" / "Generated",
-        test_folder_root / "Test Mod Folder" / "Mods",
+        test_folder_root / "Mods",
         test_folder_root / "modsettings.lsx",
     ]
 
