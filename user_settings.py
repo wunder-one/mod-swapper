@@ -127,6 +127,7 @@ class UserSettings():
             print(f"Warning: Failed to load config, using defaults. Error: {e}")
             return cls.create_with_defaults()
         
+
     def save_settings(self):
         USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         data = asdict(self)

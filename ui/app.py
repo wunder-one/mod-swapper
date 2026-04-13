@@ -15,9 +15,8 @@ class App(customtkinter.CTk):
 
         self.title("BG3 Profile Swapper")
         no_of_rows = (len(self.profile_list) - 1) // 3 + 1
-        self.geometry(f"{190 * 3}x{52 + 96 * no_of_rows}")
+        self.geometry(f"{190 * 3}x{52 + 96 * (no_of_rows + 1)}")
         self.grid_columnconfigure((0, 1, 2), weight=1)
-        # self.grid_rowconfigure(1, weight=1)
 
         self.button_bar = ButtonBar(self, self.profile_list, self.prof_state, self.user_settings)
         self.button_bar.grid(row=0, column=0, pady=(0, 0), columnspan=3, sticky="ew")
@@ -52,16 +51,11 @@ class App(customtkinter.CTk):
 
     def open_settings_window(self):
         if self.settings_window is None or not self.settings_window.winfo_exists():
-            window = SettingsWindow(self)
+            window = SettingsWindow(self, self.user_settings)
             self.settings_window = window
             window.bind('<Map>', lambda event: window.focus())
         else:
             self.settings_window.focus()
-
-    # ----- Full width button for later -----
-    # def button_callback(self):
-    #     print("Button clicked! Refreshing profiles...")
-    #     self.refresh_profiles()
 
 
 class ProfileFrame(customtkinter.CTkFrame):
