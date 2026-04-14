@@ -10,16 +10,18 @@ class SettingsWindow(customtkinter.CTkToplevel):
         self.user_settings = user_settings
 
         self.title_header = customtkinter.CTkLabel(self, text="Settings", fg_color="gray30", corner_radius=6)
-        self.title_header.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
+        self.title_header.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="ew")
 
         self.install_type_fr = DropdownPicker(self, "Install Type")
-        self.install_type_fr.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="ew")        
+        self.install_type_fr.grid(row=1, column=0, padx=20, pady=(10, 0), sticky="ew")        
 
         self.game_folder_fr = SingleDirPathSetting(self, "Game Folder")
-        self.game_folder_fr.grid(row=2, column=0, padx=10, pady=(10, 0), sticky="ew")
+        self.game_folder_fr.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
 
+        self.swap_paths_t = customtkinter.CTkLabel(self, text="Files and folders to swap")
+        self.swap_paths_t.grid(row=3, column=0, padx=20, pady=(10, 0), sticky="w")
         self.swap_paths_fr = PathListEditor(self, "Files and folders to swap")
-        self.swap_paths_fr.grid(row=3, column=0, padx=10, pady=(10, 0), sticky="ew")
+        self.swap_paths_fr.grid(row=4, column=0, padx=20, pady=(0, 0), sticky="ew")
 
     def apply_settings(self):
         # fetch current values from settings window
@@ -63,29 +65,43 @@ class PathListEditor(customtkinter.CTkFrame):
         super().__init__(master)
         self.grid_columnconfigure(0, weight=1)
         self.title = title
-        self.configure(fg_color="transparent")
+        self.configure(border_width=2)
 
-        self.title = customtkinter.CTkLabel(self, text=self.title)
-        self.title.grid(row=0, column=0, padx=0, pady=0, sticky="w")
+        # self.title = customtkinter.CTkLabel(self, text=self.title)
+        # self.title.grid(row=0, column=0, padx=0, pady=0, sticky="w")
 
         self.scrollable_path_frame = ScrollablePathFrame(self)
-        self.scrollable_path_frame.grid(row=1, column=0, columnspan=4, padx=0, pady=0, sticky="ew")
+        self.scrollable_path_frame.grid(row=0, column=0, columnspan=4, padx=4, pady=(10, 0), sticky="ew")
+        
+        self.new_entry = customtkinter.CTkEntry(self)
+        self.new_entry.grid(row=1, column=0, padx=0, pady=(0, 4), sticky="ew")
 
 class ScrollablePathFrame(customtkinter.CTkScrollableFrame):
     def __init__(self, master):
         super().__init__(master)
         self.grid_columnconfigure(0, weight=1)
-        # self.configure(fg_color="transparent")
         # TODO: replace temp_values
         self.temp_values = ["this", "is", "a list"]
         self.populate_list()
+        self.configure(corner_radius=0, border_width=0, fg_color="transparent")
 
     def populate_list(self):
         for i in range(len(self.temp_values)):
-            self.textbox = customtkinter.CTkTextbox(master=self, height=28, wrap='none')
-            self.textbox.insert("0.0", self.temp_values[i])
-            self.textbox.grid(row=i, column=0, padx=10, pady=0, sticky="ew")
-            self.textbox.configure(state="disabled")
-            self.delete_btn = customtkinter.CTkButton(self, text="x", width=28)
-            self.delete_btn.grid(row=i, column=1, sticky="e")
+            self.entry_f = ScrollablePathFrameEntry(self, self.temp_values[i])
+            self.entry_f.grid(row=i, column=0, padx=(10, 2), pady=0, sticky="ew")
 
+class ScrollablePathFrameEntry(customtkinter.CTkFrame):
+    def __init__(self, master, value):
+        super().__init__(master)
+        self.value = value
+        self.grid_columnconfigure(0, weight=1)
+        self.configure(border_width=2)
+
+        self.textbox = customtkinter.CTkEntry(self)
+        self.textbox.insert(0, self.value)
+        self.textbox.grid(row=0, column=0, padx=(2, 0), pady=2, sticky="ew")
+        self.textbox.configure(corner_radius=0, state="readonly", border_width=0, fg_color=self.cget("fg_color"))
+
+        self.delete_btn = customtkinter.CTkButton(self, text="x", width=28)
+        self.delete_btn.grid(row=0, column=1, padx=(0, 2), pady=0, sticky="ew")
+        self.delete_btn.configure(border_width=0, fg_color="transparent")
