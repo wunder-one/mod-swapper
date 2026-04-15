@@ -94,7 +94,7 @@ class ProfileFrame(customtkinter.CTkFrame):
             self.configure(fg_color=("gray86", "gray17"), border_color="green", border_width=2)
             self.activate_button.configure(state="disabled", fg_color=("#F9F9FA", "#343638"), text="Active Profile")
         else:
-            self.configure(fg_color=("gray98", "gray11"), border_width=0)
+            self.configure(fg_color=("gray98", "gray11"), border_color=("gray85", "gray18"), border_width=2)
             self.activate_button.configure(state="normal", fg_color=("#3B8ED0", "#1F6AA5"), text="Activate Profile")
 
 class ButtonBar(customtkinter.CTkFrame):

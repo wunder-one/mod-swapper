@@ -1,6 +1,7 @@
 import ui.app
 from profile_state import ProfileState
 from user_settings import UserSettings
+from customtkinter import set_default_color_theme
 
 def main():
     prof_state = ProfileState.load_config()
@@ -9,6 +10,8 @@ def main():
     print(f"Available profiles: {list(prof_state.profiles.keys())}")
     print(f"Game Folder: {user_settings.game_folder}")
 
+    set_default_color_theme("ui/theme.json")
+    # set_default_color_theme("green")
     app = ui.app.App(prof_state, user_settings)
     app.mainloop()
 
