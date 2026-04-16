@@ -80,7 +80,7 @@ def save_live_to_profile(profile_name: str, user_settings: UserSettings):
         if live_path.exists():
             storage_folder = profile_folder / live_path.name
             storage_folder.mkdir(parents=True, exist_ok=True)
-            excluded_files, excluded_dirs = user_settings.get_protected_paths()
+            excluded_files, excluded_dirs = user_settings.get_all_protected_paths()
             if live_path.is_dir():
                 mirror_directory(
                     live_path, 
@@ -127,7 +127,7 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
     with manifest_file.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
 
-    excluded_files, excluded_dirs = user_settings.get_protected_paths()
+    excluded_files, excluded_dirs = user_settings.get_all_protected_paths()
     for target in manifest.get("targets", []):
         storage_path = Path(target["storage"])
         dst_path = Path(target["source"])

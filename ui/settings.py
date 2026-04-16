@@ -1,5 +1,18 @@
+from os import path
+from pathlib import Path
+from typing import Any
 import customtkinter
 from tkinter import filedialog
+
+def bind_entry_show_path_tail(entry: customtkinter.CTkEntry, include_keyrelease: bool = False) -> None:
+    # Keep long path entries scrolled to the right end.
+    def _scroll_to_end(_event=None):
+        entry.xview_moveto(1.0)
+
+    entry.bind("<FocusIn>", _scroll_to_end)
+    if include_keyrelease:
+        entry.bind("<KeyRelease>", _scroll_to_end)
+    _scroll_to_end()
 
 class SettingsWindow(customtkinter.CTkToplevel):
     def __init__(self, master, user_settings, *args, **kwargs):
@@ -19,17 +32,17 @@ class SettingsWindow(customtkinter.CTkToplevel):
 
         self.swap_paths_t = customtkinter.CTkLabel(self, text="Files and folders to swap")
         self.swap_paths_t.grid(row=3, column=0, padx=20, pady=(10, 0), sticky="w")
-        self.swap_paths_fr = PathListEditor(self)
+        self.swap_paths_fr = PathListEditor(self, self.user_settings.get_swap_paths())
         self.swap_paths_fr.grid(row=4, column=0, padx=20, pady=(0, 0), sticky="ew")
 
         self.game_folder_t = customtkinter.CTkLabel(self, text="Game Folder")
         self.game_folder_t.grid(row=1, column=1, padx=20, pady=(10, 0), sticky="w")
-        self.game_folder_fr = SingleDirPathSetting(self)
+        self.game_folder_fr = SingleDirPathSetting(self, self.user_settings.game_folder)
         self.game_folder_fr.grid(row=2, column=1, padx=20, pady=(0, 0), sticky="ew")
 
         self.protected_paths_t = customtkinter.CTkLabel(self, text="Protected files and folders")
         self.protected_paths_t.grid(row=3, column=1, padx=20, pady=(10, 0), sticky="w")
-        self.protected_paths_fr = PathListEditor(self)
+        self.protected_paths_fr = PathListEditor(self, self.user_settings.get_user_protected_paths())
         self.protected_paths_fr.grid(row=4, column=1, padx=20, pady=(0, 0), sticky="ew")
 
     def apply_settings(self):
@@ -47,34 +60,45 @@ class DropdownPicker(customtkinter.CTkFrame):
         self.install_type.grid(row=2, column=0, padx=0, pady=0, sticky="w")
 
 class SingleDirPathSetting(customtkinter.CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, path: Path):
         super().__init__(master)
         self.grid_columnconfigure(0, weight=1)
         self.configure(fg_color="transparent")
+        self.path_str = customtkinter.StringVar(value=str(path))
 
-        self.textbox = customtkinter.CTkEntry(self)
+        self.textbox = customtkinter.CTkEntry(self, textvariable=self.path_str)
         self.textbox.grid(row=1, column=0, padx=(0, 10), pady=0, sticky="ew")
+        bind_entry_show_path_tail(self.textbox, include_keyrelease=True)
 
         self.browse_btn = customtkinter.CTkButton(self, text="Browse...", command=self.browse_folders, width=100)
         self.browse_btn.grid(row=1, column=1, padx=0, pady=0, sticky="e")
 
     def browse_folders(self):
-        filedialog.askdirectory(mustexist=True)
+        path = filedialog.askdirectory(
+        parent=self.winfo_toplevel(),
+        mustexist=True,
+        initialdir=self.path_str.get() or None,
+    )
+        if path:
+            self.path_str.set(str(path))
+            bind_entry_show_path_tail(self.textbox, include_keyrelease=True)
 
 class PathListEditor(customtkinter.CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, list_values: list[Path]):
         super().__init__(master)
+        self.list_values = list_values
         self.grid_columnconfigure(2, weight=1)
         self.configure(border_width=2, corner_radius=8, fg_color="transparent")
 
         # self.title = customtkinter.CTkLabel(self, text=self.title)
         # self.title.grid(row=0, column=0, padx=0, pady=0, sticky="w")
 
-        self.scrollable_path_frame = ScrollablePathFrame(self)
+        self.scrollable_path_frame = ScrollablePathFrame(self, list_values=self.list_values)
         self.scrollable_path_frame.grid(row=0, column=0, columnspan=4, padx=6, pady=(6, 4), sticky="ew")
         
         self.new_entry = customtkinter.CTkEntry(self)
         self.new_entry.grid(row=1, column=0, columnspan=3, padx=(6, 2), pady=(0, 2), sticky="ew")
+        bind_entry_show_path_tail(self.new_entry, include_keyrelease=True)
 
         self.add_btn = customtkinter.CTkButton(self, text="+", width=28, height=26)
         self.add_btn.grid(row=1, column=3, padx=(0, 6), pady=(0, 2), sticky="e")
@@ -88,19 +112,20 @@ class PathListEditor(customtkinter.CTkFrame):
 
 
 class ScrollablePathFrame(customtkinter.CTkScrollableFrame):
-    def __init__(self, master):
+    def __init__(self, master, list_values: list):
         super().__init__(master)
         self.grid_columnconfigure(0, weight=1)
         # TODO: replace temp_values
-        self.temp_values = ["this", "is", "a list", "this", "is", "a list", "this", "is", "a list",]
-        self.populate_list()
-        # self.configure(corner_radius=0, border_width=0, fg_color="transparent")
-        self.configure(border_width=0, corner_radius=6, fg_color=("gray80", "gray20"), height=200)
+        self.list_values = list_values
+        self.list_items = []
 
-    def populate_list(self):
-        for i in range(len(self.temp_values)):
-            self.entry_f = ScrollablePathFrameEntry(self, self.temp_values[i])
-            self.entry_f.grid(row=i, column=0, padx=(2, 0), pady=(2, 0), sticky="nsew")
+        print(f"List Values -> {self.list_values}")
+        for i, value in enumerate(self.list_values):
+            entry_f = ScrollablePathFrameEntry(self, value)
+            entry_f.grid(row=i, column=0, padx=(2, 0), pady=(2, 0), sticky="nsew")
+            self.list_items.append(entry_f)
+
+        self.configure(border_width=0, corner_radius=6, fg_color=("gray80", "gray20"), height=200)
 
 class ScrollablePathFrameEntry(customtkinter.CTkFrame):
     def __init__(self, master, value):
@@ -108,8 +133,9 @@ class ScrollablePathFrameEntry(customtkinter.CTkFrame):
         self.value = value
         self.grid_columnconfigure(0, weight=1)
         self.textbox = customtkinter.CTkEntry(self)
-        self.textbox.insert(0, self.value)
+        self.textbox.insert(0, str(self.value))
         self.textbox.grid(row=0, column=0, padx=(2, 0), pady=1, sticky="ew")
+        bind_entry_show_path_tail(self.textbox)
         self.textbox.configure(state="readonly", fg_color=("gray90", "gray14"), border_width=0)
         self.configure(fg_color=self.textbox.cget("fg_color"), border_width=0)
         # self.configure(fg_color="green", border_width=0)

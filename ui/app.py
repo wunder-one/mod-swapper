@@ -10,7 +10,7 @@ class App(customtkinter.CTk):
         super().__init__()
         self.prof_state = prof_state
         self.user_settings = user_settings
-        self.profile_list = list(self.prof_state.profiles.keys())
+        self.profile_list = list[str](self.prof_state.profiles.keys())
         self.profile_frames = {}
 
         self.title("BG3 Profile Swapper")
@@ -26,8 +26,8 @@ class App(customtkinter.CTk):
         self.settings_window: SettingsWindow | None = None
 
     def create_profile_frames(self):
-        self.profile_list = list(self.prof_state.profiles.keys())
-        for i, profile_name in enumerate(self.profile_list):
+        self.profile_list = list[str](self.prof_state.profiles.keys())
+        for i, profile_name in enumerate[str](self.profile_list):
             profile_frame = ProfileFrame(self, profile_name, self.prof_state, self.user_settings)
             left_pad = 10 if i % 3 == 0 else 0
             profile_frame.grid(row=i // 3 + 1, column=i % 3, padx=(left_pad, 10), pady=(10, 0), sticky="nsew")

@@ -30,42 +30,45 @@ def get_default_game_folder() -> Path:
         raise FileNotFoundError(f"Game folder not found at {game_folder}. Please check the path and try again.")
     return game_folder
 
-def get_swap_folder_defaults(game_folder: Path) -> list[Path]:
-    if not game_folder:
-        return []
-    test_folder_root = USER_DIR / "Desktop" / "Mod Swapper Test Folder"
-    return [
-        game_folder / "bin" / "NativeMods",
-        game_folder / "Data" / "Generated",
-        test_folder_root / "Mods",
-        test_folder_root / "modsettings.lsx",
-    ]
-
-def get_protected_path_defaults(game_folder: Path) -> list[Path]:
-    if not game_folder:
-        return []
-    return [
-        game_folder / "DigitalDeluxe",
-        game_folder / "DotNetCore",
-        game_folder / "Launcher",
-        game_folder / "Data" / "Localization",
-    ]
-
-def get_critical_game_paths(game_folder: Path) -> list[Path]:
-    result = []
-    if not game_folder:
-        return result
-    for path in CRITICAL_GAME_FOLDER_PATHS:
-        path = game_folder / path
-        result.append(path)
-    return result
-
 @dataclass
 class UserSettings():
     game_folder: Path
     swap_paths: list[Path]
-    protected_paths: list[Path]
+    user_protected_paths: list[Path]
     critical_game_paths: list[Path]
+
+    @staticmethod
+    def _get_default_swap_paths(game_folder: Path) -> list[Path]:
+        if not game_folder:
+            return []
+        test_folder_root = USER_DIR / "Desktop" / "Mod Swapper Test Folder"
+        return [
+            game_folder / "bin" / "NativeMods",
+            game_folder / "Data" / "Generated",
+            test_folder_root / "Mods",
+            test_folder_root / "modsettings.lsx",
+        ]
+
+    @staticmethod
+    def _get_default_protected_paths(game_folder: Path) -> list[Path]:
+        if not game_folder:
+            return []
+        return [
+            game_folder / "DigitalDeluxe",
+            game_folder / "DotNetCore",
+            game_folder / "Launcher",
+            game_folder / "Data" / "Localization",
+        ]
+
+    @staticmethod
+    def _getcritical_game_paths(game_folder: Path) -> list[Path]:
+        result = []
+        if not game_folder:
+            return result
+        for path in CRITICAL_GAME_FOLDER_PATHS:
+            path = game_folder / path
+            result.append(path)
+        return result
 
     def __post_init__(self):
         self.save_settings()
@@ -74,9 +77,9 @@ class UserSettings():
         # Wipes current settings and re-detects the game paths.
         game_folder = get_default_game_folder()
         self.game_folder = game_folder
-        self.swap_paths = get_swap_folder_defaults(game_folder)
-        self.protected_paths = get_protected_path_defaults(game_folder)
-        self.critical_game_paths = get_critical_game_paths(game_folder)
+        self.swap_paths = self._get_default_swap_paths(game_folder)
+        self.protected_paths = self._get_default_protected_paths(game_folder)
+        self.critical_game_paths = self._getcritical_game_paths(game_folder)
         # Save to disk again
         self.save_settings()
 
@@ -85,9 +88,9 @@ class UserSettings():
         game_folder = get_default_game_folder()
         return cls(
             game_folder=game_folder,
-            swap_paths=get_swap_folder_defaults(game_folder),
-            protected_paths=get_protected_path_defaults(game_folder),
-            critical_game_paths=get_critical_game_paths(game_folder),
+            swap_paths=cls._get_default_swap_paths(game_folder),
+            user_protected_paths=cls._get_default_protected_paths(game_folder),
+            critical_game_paths=cls._getcritical_game_paths(game_folder),
         )
 
     @classmethod
@@ -119,7 +122,7 @@ class UserSettings():
                 else:
                     converted_data[field_name] = value
             game_folder = converted_data.get("game_folder") or get_default_game_folder()
-            return cls(critical_game_paths=get_critical_game_paths(game_folder), **converted_data)
+            return cls(critical_game_paths=cls._getcritical_game_paths(game_folder), **converted_data)
         
         except (json.JSONDecodeError, TypeError) as e:
             # If the file is garbled or missing required fields, 
@@ -135,10 +138,16 @@ class UserSettings():
         json_data = json.dumps(data, indent=4, default=str)
         USER_SETTINGS_FILE.write_text(json_data, encoding="utf-8")
 
-    def get_protected_paths(self) -> tuple[list[Path], list[Path]]:
+    def get_swap_paths(self) -> list[Path]:
+        return self.swap_paths
+
+    def get_user_protected_paths(self) -> list[Path]:
+        return self.user_protected_paths
+
+    def get_all_protected_paths(self) -> tuple[list[Path], list[Path]]:
         excluded_files = []
         excluded_dirs = []
-        for protected_path in chain(self.protected_paths, self.critical_game_paths):
+        for protected_path in chain[Path](self.user_protected_paths, self.critical_game_paths):
             if protected_path.is_file():
                 excluded_files.append(protected_path)
             if protected_path.is_dir():
