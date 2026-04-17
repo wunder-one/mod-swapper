@@ -1,6 +1,7 @@
 import winreg
-import json
 from pathlib import Path
+
+from constants import BG3_STEAM_ID
 
 def find_steam_path() -> Path | None:
     # Find steam install location from win registry
@@ -26,8 +27,8 @@ def parse_vdf_value(line: str) -> str:
     return parts[3] if len(parts) >= 4 else ""
 
 
-def find_game_install_path(app_id: str) -> Path | None:
-
+def find_steam_game_install_path() -> Path | None:
+    app_id = BG3_STEAM_ID
     # Search all Steam libraries for an installed game by App ID.
     # Returns the full path to the game's install folder, or None if not found.
 
@@ -58,7 +59,9 @@ def find_game_install_path(app_id: str) -> Path | None:
             for line in f:
                 if '"installdir"' in line:
                     install_dir = parse_vdf_value(line)
-                    return target_steam_folder / "steamapps" / "common" / install_dir
+                    game_path = target_steam_folder / "steamapps" / "common" / install_dir
+                    if game_path.exists():
+                        return game_path
 
     return None
 

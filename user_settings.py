@@ -1,3 +1,4 @@
+from ast import Tuple
 import json
 import os
 import typing
@@ -7,19 +8,22 @@ from typing import Literal
 from itertools import chain
 
 from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, LOCAL_APPDATA, USER_DIR, CRITICAL_GAME_FOLDER_PATHS, DEFAULT_STEAM_GAME_FOLDER, DEFAULT_GOG_GAME_FOLDER
-from functions.discover_steam import find_game_install_path
+from functions.discover_steam import find_steam_game_install_path
 
 InstallType = Literal["steam", "gog", "custom"]
 
-def guess_install_type() -> InstallType:
-    # TODO: logic that determines install type goes here
+def guess_install_type_and_folder() -> tuple[InstallType, Path | None]:
+    steam_path = find_steam_game_install_path()
+    if steam_path:
+        return "steam", steam_path
+    # TODO: logic for GOG install
     # Setting game type to steam for testing
-    return "steam"
+    return "custom", None
 
 @dataclass
 class UserSettings():
     install_type: InstallType
-    game_folder: Path
+    game_folder: Path | None
     swap_paths: list[Path]
     user_protected_paths: list[Path]
     critical_game_paths: list[Path]
@@ -38,19 +42,24 @@ class UserSettings():
         return game_folder
 
     @staticmethod
-    def _get_default_swap_paths(game_folder: Path) -> list[Path]:
-        if not game_folder:
-            return []
+    def _get_default_swap_paths(game_folder: Path | None) -> list[Path]:
         test_folder_root = USER_DIR / "Desktop" / "Mod Swapper Test Folder"
-        return [
-            game_folder / "bin" / "NativeMods",
-            game_folder / "Data" / "Generated",
+        app_data_paths = [
             test_folder_root / "Mods",
             test_folder_root / "modsettings.lsx",
         ]
+        if not game_folder:
+            return app_data_paths
+        else:
+            game_folder_paths = [
+                game_folder / "bin" / "NativeMods",
+                game_folder / "Data" / "Generated",
+            ]
+            app_data_paths.extend(game_folder_paths)
+            return app_data_paths
 
     @staticmethod
-    def _get_default_protected_paths(game_folder: Path) -> list[Path]:
+    def _get_default_protected_paths(game_folder: Path | None) -> list[Path]:
         if not game_folder:
             return []
         return [
@@ -61,7 +70,7 @@ class UserSettings():
         ]
 
     @staticmethod
-    def _getcritical_game_paths(game_folder: Path) -> list[Path]:
+    def _getcritical_game_paths(game_folder: Path | None) -> list[Path]:
         result = []
         if not game_folder:
             return result
@@ -75,8 +84,7 @@ class UserSettings():
 
     def reset_to_defaults(self):
         # Wipes current settings and re-detects the game paths.
-        install_type = guess_install_type()
-        game_folder = self._get_default_game_folder(install_type)
+        install_type, game_folder = guess_install_type_and_folder()
         self.install_type = install_type
         self.game_folder = game_folder
         self.swap_paths = self._get_default_swap_paths(game_folder)
@@ -87,8 +95,7 @@ class UserSettings():
 
     @classmethod
     def create_with_defaults(cls) -> "UserSettings":
-        install_type = guess_install_type()
-        game_folder = cls._get_default_game_folder(install_type)
+        install_type, game_folder = guess_install_type_and_folder()
         return cls(
             install_type=install_type,
             game_folder=game_folder,
@@ -117,8 +124,9 @@ class UserSettings():
             # print(f"Filtered Data before converting => {filtered_data}")
 
             converted_data = {}
-            install_type = filtered_data.get("install_type", guess_install_type())
-            game_folder = Path(filtered_data.get("game_folder", cls._get_default_game_folder(install_type)))
+            default_install_type, default_game_folder = guess_install_type_and_folder()
+            install_type = filtered_data.get("install_type", default_install_type)
+            game_folder = Path(filtered_data.get("game_folder", default_game_folder))
             for field_name, field_type in allowed_keys.items():
                 if field_name in filtered_data:
                     value = filtered_data[field_name]
@@ -131,7 +139,7 @@ class UserSettings():
                 else:
                     match field_name:
                         case "install_type":
-                            converted_data[field_name] = guess_install_type()
+                            converted_data[field_name] = default_install_type
                         case "game_folder":
                             converted_data[field_name] = cls._get_default_game_folder(install_type)
                         case "swap_paths":
