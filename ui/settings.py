@@ -47,7 +47,7 @@ class SettingsWindow(customtkinter.CTkToplevel):
 
     def apply_settings(self):
         # fetch current values from settings window
-        # and apply to master.user_settings.<field_name>
+        # and save to self.user_settings
         self.user_settings.save_settings()
 
 class DropdownPicker(customtkinter.CTkFrame):

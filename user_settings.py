@@ -9,33 +9,33 @@ from itertools import chain
 from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, LOCAL_APPDATA, USER_DIR, CRITICAL_GAME_FOLDER_PATHS, DEFAULT_STEAM_GAME_FOLDER, DEFAULT_GOG_GAME_FOLDER
 from functions.discover_steam import find_game_install_path
 
-# determine if the game is from Steam or GOG
 InstallType = Literal["steam", "gog", "custom"]
 
-def get_game_install_type() -> InstallType:
+def guess_install_type() -> InstallType:
     # TODO: logic that determines install type goes here
     # Setting game type to steam for testing
     return "steam"
 
-def get_default_game_folder() -> Path:
-    install_type = get_game_install_type()
-    print(f"install_type == {install_type}")
-    if install_type == "steam":
-        game_folder = DEFAULT_STEAM_GAME_FOLDER
-    elif install_type == "gog":
-        game_folder = DEFAULT_GOG_GAME_FOLDER
-    else:
-        raise ValueError(f"Cannot provide default folder path without install type")
-    if not game_folder.exists():
-        raise FileNotFoundError(f"Game folder not found at {game_folder}. Please check the path and try again.")
-    return game_folder
-
 @dataclass
 class UserSettings():
+    install_type: InstallType
     game_folder: Path
     swap_paths: list[Path]
     user_protected_paths: list[Path]
     critical_game_paths: list[Path]
+
+    @staticmethod
+    def _get_default_game_folder(install_type) -> Path:
+        print(f"install_type == {install_type}")
+        if install_type == "steam":
+            game_folder = DEFAULT_STEAM_GAME_FOLDER
+        elif install_type == "gog":
+            game_folder = DEFAULT_GOG_GAME_FOLDER
+        else:
+            raise ValueError(f"Cannot provide default folder path without install type")
+        if not game_folder.exists():
+            raise FileNotFoundError(f"Game folder not found at {game_folder}. Please check the path and try again.")
+        return game_folder
 
     @staticmethod
     def _get_default_swap_paths(game_folder: Path) -> list[Path]:
@@ -75,7 +75,9 @@ class UserSettings():
 
     def reset_to_defaults(self):
         # Wipes current settings and re-detects the game paths.
-        game_folder = get_default_game_folder()
+        install_type = guess_install_type()
+        game_folder = self._get_default_game_folder(install_type)
+        self.install_type = install_type
         self.game_folder = game_folder
         self.swap_paths = self._get_default_swap_paths(game_folder)
         self.protected_paths = self._get_default_protected_paths(game_folder)
@@ -85,8 +87,10 @@ class UserSettings():
 
     @classmethod
     def create_with_defaults(cls) -> "UserSettings":
-        game_folder = get_default_game_folder()
+        install_type = guess_install_type()
+        game_folder = cls._get_default_game_folder(install_type)
         return cls(
+            install_type=install_type,
             game_folder=game_folder,
             swap_paths=cls._get_default_swap_paths(game_folder),
             user_protected_paths=cls._get_default_protected_paths(game_folder),
@@ -104,26 +108,42 @@ class UserSettings():
                 data = json.load(f)
             
             # Avoid breaking if config file contains unknown fields
-            allowed_keys = {f.name for f in fields(cls) if f.init}
-            allowed_keys.discard("critical_game_paths")
+            allowed_keys = {f.name: f.type for f in fields(cls) if f.init}
+            del allowed_keys["critical_game_paths"]
             filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
 
             # print(f"Dataclass Values => {cls.__dataclass_fields__.values()}")
             # Convert the list of strings back into a list of Paths
             # print(f"Filtered Data before converting => {filtered_data}")
-            hints = typing.get_type_hints(cls)
+
             converted_data = {}
-            for field_name, value in filtered_data.items():
-                hint = hints[field_name]
-                if hint == Path:
-                    converted_data[field_name] = Path(value)
-                elif hint == list[Path]:
-                    converted_data[field_name] = [Path(p) for p in value]
+            install_type = filtered_data.get("install_type", guess_install_type())
+            game_folder = Path(filtered_data.get("game_folder", cls._get_default_game_folder(install_type)))
+            for field_name, field_type in allowed_keys.items():
+                if field_name in filtered_data:
+                    value = filtered_data[field_name]
+                    if field_type == Path:
+                        converted_data[field_name] = Path(value)
+                    elif field_type == list[Path]:
+                        converted_data[field_name] = [Path(p) for p in value]
+                    else:
+                        converted_data[field_name] = value
                 else:
-                    converted_data[field_name] = value
-            game_folder = converted_data.get("game_folder") or get_default_game_folder()
+                    match field_name:
+                        case "install_type":
+                            converted_data[field_name] = guess_install_type()
+                        case "game_folder":
+                            converted_data[field_name] = cls._get_default_game_folder(install_type)
+                        case "swap_paths":
+                            converted_data[field_name] = cls._get_default_swap_paths(game_folder)
+                        case "protected_paths":
+                            converted_data[field_name] = cls._get_default_protected_paths(game_folder)
+
             return cls(critical_game_paths=cls._getcritical_game_paths(game_folder), **converted_data)
-        
+
+
+
+
         except (json.JSONDecodeError, TypeError) as e:
             # If the file is garbled or missing required fields, 
             # fall back to a fresh default config.
