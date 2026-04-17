@@ -4,6 +4,8 @@ from typing import Any
 import customtkinter
 from tkinter import filedialog
 
+from user_settings import UserSettings
+
 def bind_entry_show_path_tail(entry: customtkinter.CTkEntry, include_keyrelease: bool = False) -> None:
     # Keep long path entries scrolled to the right end.
     def _scroll_to_end(_event=None):
@@ -15,7 +17,7 @@ def bind_entry_show_path_tail(entry: customtkinter.CTkEntry, include_keyrelease:
     _scroll_to_end()
 
 class SettingsWindow(customtkinter.CTkToplevel):
-    def __init__(self, master, user_settings, *args, **kwargs):
+    def __init__(self, master, user_settings: UserSettings, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         self.geometry("800x500")
         self.grid_columnconfigure((0, 1), weight=1)
@@ -27,18 +29,18 @@ class SettingsWindow(customtkinter.CTkToplevel):
 
         self.install_type_t = customtkinter.CTkLabel(self, text="Install Type")
         self.install_type_t.grid(row=1, column=0, padx=20, pady=(10, 0), sticky="w")
-        self.install_type_fr = DropdownPicker(self)
+        self.install_type_fr = DropdownPicker(self, values=["Steam", "GOG Galaxy", "Custom"])
         self.install_type_fr.grid(row=2, column=0, padx=20, pady=(0, 0), sticky="ew")        
-
-        self.swap_paths_t = customtkinter.CTkLabel(self, text="Files and folders to swap")
-        self.swap_paths_t.grid(row=3, column=0, padx=20, pady=(10, 0), sticky="w")
-        self.swap_paths_fr = PathListEditor(self, self.user_settings.get_swap_paths())
-        self.swap_paths_fr.grid(row=4, column=0, padx=20, pady=(0, 0), sticky="ew")
 
         self.game_folder_t = customtkinter.CTkLabel(self, text="Game Folder")
         self.game_folder_t.grid(row=1, column=1, padx=20, pady=(10, 0), sticky="w")
         self.game_folder_fr = SingleDirPathSetting(self, self.user_settings.game_folder)
         self.game_folder_fr.grid(row=2, column=1, padx=20, pady=(0, 0), sticky="ew")
+
+        self.swap_paths_t = customtkinter.CTkLabel(self, text="Files and folders to swap")
+        self.swap_paths_t.grid(row=3, column=0, padx=20, pady=(10, 0), sticky="w")
+        self.swap_paths_fr = PathListEditor(self, self.user_settings.get_swap_paths())
+        self.swap_paths_fr.grid(row=4, column=0, padx=20, pady=(0, 0), sticky="ew")
 
         self.protected_paths_t = customtkinter.CTkLabel(self, text="Protected files and folders")
         self.protected_paths_t.grid(row=3, column=1, padx=20, pady=(10, 0), sticky="w")
@@ -46,21 +48,34 @@ class SettingsWindow(customtkinter.CTkToplevel):
         self.protected_paths_fr.grid(row=4, column=1, padx=20, pady=(0, 0), sticky="ew")
 
     def apply_settings(self):
+        match self.install_type_fr.get():
+            case "Steam":
+                self.user_settings.install_type = "steam"
+            case "GOG Galaxy":
+                self.user_settings.install_type = "gog"
+            case "Custom":
+                self.user_settings.install_type = "custom"
+        self.user_settings.game_folder = self.game_folder_fr.get()
+        self.user_settings.swap_paths = self.swap_paths_fr.get()
+        self.user_settings.user_protected_paths = self.protected_paths_fr.get()
         # fetch current values from settings window
         # and save to self.user_settings
         self.user_settings.save_settings()
 
 class DropdownPicker(customtkinter.CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, values):
         super().__init__(master)
         self.grid_columnconfigure(0, weight=1)
         self.configure(fg_color="transparent")
-
-        self.install_type = customtkinter.CTkOptionMenu(self, values=["Steam", "GOG Galaxy", "Custom"])
+        self.install_type = customtkinter.CTkOptionMenu(self, values=values)
         self.install_type.grid(row=2, column=0, padx=0, pady=0, sticky="w")
 
+    def get(self) -> str:
+        return self.install_type.get()
+
 class SingleDirPathSetting(customtkinter.CTkFrame):
-    def __init__(self, master, path: Path):
+    def __init__(self, master, path):
+        path = path if path else ""
         super().__init__(master)
         self.grid_columnconfigure(0, weight=1)
         self.configure(fg_color="transparent")
@@ -78,10 +93,14 @@ class SingleDirPathSetting(customtkinter.CTkFrame):
         parent=self.winfo_toplevel(),
         mustexist=True,
         initialdir=self.path_str.get() or None,
-    )
+        )
         if path:
             self.path_str.set(str(path))
             bind_entry_show_path_tail(self.textbox, include_keyrelease=True)
+
+    def get(self) -> Path:
+        return Path(self.textbox.get())
+
 
 class PathListEditor(customtkinter.CTkFrame):
     def __init__(self, master, list_values: list[Path]):
@@ -110,12 +129,16 @@ class PathListEditor(customtkinter.CTkFrame):
         self.browse_file = customtkinter.CTkButton(self, text="Browse File", width=100, height=24)
         self.browse_file.grid(row=2, column=1, padx=(0, 2), pady=(0, 6))
 
+    def get(self) -> list[Path]:
+        path_list = []
+        for entry_f in self.scrollable_path_frame.list_items:
+            path_list.append(Path(entry_f.value))
+        return path_list
 
 class ScrollablePathFrame(customtkinter.CTkScrollableFrame):
     def __init__(self, master, list_values: list):
         super().__init__(master)
         self.grid_columnconfigure(0, weight=1)
-        # TODO: replace temp_values
         self.list_values = list_values
         self.list_items = []
 
@@ -130,9 +153,9 @@ class ScrollablePathFrame(customtkinter.CTkScrollableFrame):
 class ScrollablePathFrameEntry(customtkinter.CTkFrame):
     def __init__(self, master, value):
         super().__init__(master)
-        self.value = value
+        self.value = customtkinter.StringVar(value=value)
         self.grid_columnconfigure(0, weight=1)
-        self.textbox = customtkinter.CTkEntry(self)
+        self.textbox = customtkinter.CTkEntry(self, textvariable=self.value)
         self.textbox.insert(0, str(self.value))
         self.textbox.grid(row=0, column=0, padx=(2, 0), pady=1, sticky="ew")
         bind_entry_show_path_tail(self.textbox)

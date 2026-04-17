@@ -1,13 +1,10 @@
-from ast import Tuple
 import json
-import os
-import typing
-from dataclasses import dataclass, field, fields, asdict
+from dataclasses import dataclass, fields, asdict
 from pathlib import Path
 from typing import Literal
 from itertools import chain
 
-from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, LOCAL_APPDATA, USER_DIR, CRITICAL_GAME_FOLDER_PATHS, DEFAULT_STEAM_GAME_FOLDER, DEFAULT_GOG_GAME_FOLDER
+from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, USER_DIR, CRITICAL_GAME_FOLDER_PATHS, DEFAULT_STEAM_GAME_FOLDER, DEFAULT_GOG_GAME_FOLDER
 from functions.discover_steam import find_steam_game_install_path
 
 InstallType = Literal["steam", "gog", "custom"]
