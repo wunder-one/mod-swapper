@@ -61,7 +61,7 @@ class App(customtkinter.CTk):
 
     def open_overwrite_dialog(self):
         if self.overwrite_dialog is None or not self.overwrite_dialog.winfo_exists():
-            self.overwrite_dialog = OverwriteDialog(self, self.prof_state)
+            self.overwrite_dialog = OverwriteDialog(self, self.prof_state, self.user_settings)
         else:
             self.overwrite_dialog.lift()
             self.overwrite_dialog.focus_set()

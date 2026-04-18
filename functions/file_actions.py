@@ -152,6 +152,15 @@ def create_new_profile(profile_name: str, prof_state: ProfileState, user_setting
     prof_state.save_config()
     return profile_name
 
+def overwrite_profile(profile_to_overwrite: str, prof_state: ProfileState, user_settings: UserSettings):
+    profile_to_overwrite_dir = PROFILES_SNAPSHOT_DIR / profile_to_overwrite
+    if not profile_to_overwrite_dir.exists():
+        raise FileNotFoundError(f"Profile '{profile_to_overwrite}' does not exist.")
+    save_live_to_profile(profile_to_overwrite_dir.name, user_settings)
+    prof_state.active_profile = profile_to_overwrite_dir.name
+    prof_state.save_config()
+    return profile_to_overwrite_dir.name
+
 def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings: UserSettings):
     # Validations
     # Check if the selected profile is already active
