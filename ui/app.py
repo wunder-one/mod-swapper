@@ -1,8 +1,9 @@
 import customtkinter
 
 from ui.settings import SettingsWindow
-from profile_state import ProfileState
-from user_settings import UserSettings
+from ui.overwrite_dialog import OverwriteDialog
+from config.profile_state import ProfileState
+from config.user_settings import UserSettings
 from functions.file_actions import swap_profiles, create_new_profile
 
 class App(customtkinter.CTk):
@@ -24,6 +25,7 @@ class App(customtkinter.CTk):
         self.draw_profile_frames()
         
         self.settings_window: SettingsWindow | None = None
+        self.overwrite_dialog: OverwriteDialog | None = None
 
     def draw_profile_frames(self):
         self.profile_list = list[str](self.prof_state.profiles.keys())
@@ -58,8 +60,11 @@ class App(customtkinter.CTk):
             self.settings_window.focus()
 
     def open_overwrite_dialog(self):
-        # TODO: create overwrite dialog
-        pass
+        if self.overwrite_dialog is None or not self.overwrite_dialog.winfo_exists():
+            self.overwrite_dialog = OverwriteDialog(self, self.prof_state)
+        else:
+            self.overwrite_dialog.lift()
+            self.overwrite_dialog.focus_set()
 
 class ProfileFrame(customtkinter.CTkFrame):
     def __init__(self, master: App, profile: str, prof_state: ProfileState, user_settings: UserSettings):

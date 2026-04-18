@@ -3,8 +3,8 @@ import json
 from pathlib import Path
 from shutil import move, rmtree, copy2
 
-from profile_state import ProfileState
-from user_settings import UserSettings
+from config.profile_state import ProfileState
+from config.user_settings import UserSettings
 from constants import PROFILES_SNAPSHOT_DIR, USER_DIR
 
 

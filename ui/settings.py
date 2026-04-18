@@ -4,8 +4,7 @@ from typing import Callable
 import customtkinter
 from tkinter import filedialog
 
-from user_settings import UserSettings
-import user_settings
+from config.user_settings import UserSettings
 
 def bind_entry_show_path_tail(entry: customtkinter.CTkEntry, include_keyrelease: bool = False) -> None:
     # Keep long path entries scrolled to the right end.

@@ -1,6 +1,6 @@
 import ui.app
-from profile_state import ProfileState
-from user_settings import UserSettings
+from config.profile_state import ProfileState
+from config.user_settings import UserSettings
 from customtkinter import set_default_color_theme
 from watchpoints import watch
 
