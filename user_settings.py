@@ -85,7 +85,7 @@ class UserSettings():
         self.install_type = install_type
         self.game_folder = game_folder
         self.swap_paths = self._get_default_swap_paths(game_folder)
-        self.protected_paths = self._get_default_protected_paths(game_folder)
+        self.user_protected_paths = self._get_default_protected_paths(game_folder)
         self.critical_game_paths = self._getcritical_game_paths(game_folder)
         # Save to disk again
         self.save_settings()
