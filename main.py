@@ -2,10 +2,13 @@ import ui.app
 from profile_state import ProfileState
 from user_settings import UserSettings
 from customtkinter import set_default_color_theme
+from watchpoints import watch
 
 def main():
     prof_state = ProfileState.load_config()
+    watch(prof_state)
     user_settings = UserSettings.load_settings()
+    watch(user_settings)
     print(f"Active profile from config: {prof_state.active_profile}")
     print(f"Available profiles: {list(prof_state.profiles.keys())}")
     print(f"Game Folder: {user_settings.game_folder}")

@@ -14,7 +14,7 @@ def mirror_directory(
         excluded_files: list[Path] | None = None,
         exclude_dirs: list[Path] | None = None,
     ):
-    print(f"- Mirror Directory {source_dir.name} => {dest_dir.name}")
+    # print(f"- Mirror Directory {source_dir.name} => {dest_dir.name}")
     command = [
         "robocopy",
         str(source_dir),
@@ -39,7 +39,7 @@ def mirror_directory(
         raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stderr}\n{result.stdout}")
 
 def copy_file(src_file: Path, dst_file: Path, excluded_files: list[Path] | None):
-    print(f"- Copy File {src_file.name} => {dst_file.name}")
+    # print(f"- Copy File {src_file.name} => {dst_file.name}")
     if excluded_files and dst_file in excluded_files:
         raise ValueError("Specified destination is protected")    
     if excluded_files and src_file in excluded_files:
@@ -110,13 +110,13 @@ def remove_single_files(outgoing_profile: str, incoming_profile: str):
     incoming_sources = {t["source"] for t in incoming_manifest["targets"] if t["type"] == "file"}
     for target in outgoing_manifest.get("targets"):
         if target["type"] == "file" and target["source"] not in incoming_sources:
-            print("Converting to Path")
+            # print("Converting to Path")
             p = Path(target["source"])
-            print(f"Deleting {p.name}")
+            # print(f"Deleting {p.name}")
             p.unlink(missing_ok=True)
 
 def load_profile_to_live(profile_name: str, user_settings: UserSettings):
-    print(f"Running load_profile_to_live for {profile_name}")
+    # print(f"Running load_profile_to_live for {profile_name}")
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     if not profile_folder.exists():
         raise FileNotFoundError(f"No profile folder found for '{profile_name}'")
@@ -132,7 +132,7 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
         storage_path = Path(target["storage"])
         dst_path = Path(target["source"])
         if target["type"] == "directory":
-            print(f"Restoring {storage_path.name} directory to {dst_path.name}...")
+            # print(f"Restoring {storage_path.name} directory to {dst_path.name}...")
             mirror_directory(
                 storage_path,
                 dst_path,
@@ -140,7 +140,7 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
                 exclude_dirs=excluded_dirs,
             )
         if target["type"] == "file":
-            print(f"Restoring {storage_path.name} file to {dst_path.name}...")
+            # print(f"Restoring {storage_path.name} file to {dst_path.name}...")
             copy_file(storage_path, dst_path, excluded_files)
 
 def create_new_profile(profile_name: str, prof_state: ProfileState, user_settings: UserSettings) -> str:
@@ -174,19 +174,19 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
         print(f"New backup profile: {backup_profile}")
         old_profile = backup_profile
     else:
-        print(f"Swapping from {prof_state.active_profile} to {profile_to_load}...")
+        # print(f"Swapping from {prof_state.active_profile} to {profile_to_load}...")
         save_live_to_profile(prof_state.active_profile, user_settings)
-        print(f"{prof_state.active_profile} saved to profile storage.")
+        # print(f"{prof_state.active_profile} saved to profile storage.")
 
     remove_single_files(old_profile, profile_to_load)
 
     # Loading new profile
     try:
         load_profile_to_live(profile_to_load, user_settings)
-        print(f"{profile_to_load} loaded to live mods.")
+        # print(f"{profile_to_load} loaded to live mods.")
         prof_state.active_profile = profile_to_load
         prof_state.save_config()
-        print(f"[SUCCESS] Updated active profile to '{profile_to_load}' in config...")
+        print(f"[SUCCESS] Updated active profile to '{profile_to_load}'")
         print("------ END OF SWAP ------")
         return prof_state.active_profile   
     except Exception as e:

@@ -142,7 +142,7 @@ class ScrollablePathFrame(customtkinter.CTkScrollableFrame):
         self.list_values = list_values
         self.list_items = []
 
-        print(f"List Values -> {self.list_values}")
+        # print(f"List Values -> {self.list_values}")
         for i, value in enumerate(self.list_values):
             entry_f = ScrollablePathFrameEntry(self, value)
             entry_f.grid(row=i, column=0, padx=(2, 0), pady=(2, 0), sticky="nsew")

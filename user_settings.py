@@ -27,7 +27,7 @@ class UserSettings():
 
     @staticmethod
     def _get_default_game_folder(install_type) -> Path:
-        print(f"install_type == {install_type}")
+        # print(f"install_type == {install_type}")
         if install_type == "steam":
             game_folder = DEFAULT_STEAM_GAME_FOLDER
         elif install_type == "gog":
