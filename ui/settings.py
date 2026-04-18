@@ -41,27 +41,38 @@ class SettingsWindow(customtkinter.CTkToplevel):
         self.swap_paths_t = customtkinter.CTkLabel(self, text="Files and folders to swap")
         self.swap_paths_t.grid(row=3, column=0, padx=20, pady=(10, 0), sticky="w")
         self.swap_paths_fr = PathListEditor(self, self.user_settings.get_swap_paths())
-        self.swap_paths_fr.grid(row=4, column=0, padx=20, pady=(0, 0), sticky="nsew")
+        self.swap_paths_fr.grid(row=4, column=0, padx=20, pady=(0, 0), sticky="new")
 
         self.protected_paths_t = customtkinter.CTkLabel(self, text="Protected files and folders")
         self.protected_paths_t.grid(row=3, column=1, padx=20, pady=(10, 0), sticky="w")
         self.protected_paths_fr = PathListEditor(self, self.user_settings.get_user_protected_paths())
-        self.protected_paths_fr.grid(row=4, column=1, padx=20, pady=(0, 0), sticky="nsew")
+        self.protected_paths_fr.grid(row=4, column=1, padx=20, pady=(0, 0), sticky="new")
 
-        self.button_bar = ButtonBar(
-            self,
-            on_cancel=self.cancel_settings,
-            on_apply=self.apply_settings,
-            on_ok=self.ok_settings,
-        )
-        self.button_bar.grid(row=5, column=0, columnspan=2, padx=20, pady=(10, 0), sticky="e")
+        self.button_bar = customtkinter.CTkFrame(self, fg_color="transparent")
+        self.button_bar.grid(row=5, column=0, columnspan=2, padx=20, pady=(10, 20), sticky="ew")
+        self.button_bar.grid_columnconfigure(0, weight=1)
 
-    def cancel_settings(self) -> None:
+        self.reset_defaults_btn = customtkinter.CTkButton(self.button_bar, text="Reset to Defaults", command=self.reset_default_settings)
+        self.reset_defaults_btn.grid(row=0, column=0, padx=0, pady=0, sticky="w")
+        self.cancel_btn = customtkinter.CTkButton(self.button_bar, text="Cancel", command=self.cancel_settings, width=100)
+        self.cancel_btn.grid(row=0, column=1, padx=(10, 0), pady=0, sticky="e")
+        self.apply_btn = customtkinter.CTkButton(self.button_bar, text="Apply", command=self.apply_settings, width=100)
+        self.apply_btn.grid(row=0, column=2, padx=(10, 0), pady=0, sticky="e")
+        self.ok_btn = customtkinter.CTkButton(self.button_bar, text="OK", command=self.ok_settings, width=100)
+        self.ok_btn.grid(row=0, column=3, padx=(10, 0), pady=0, sticky="e")
+        
+        
+
+    def cancel_settings(self):
         self.destroy()
 
-    def ok_settings(self) -> None:
+    def ok_settings(self):
         self.apply_settings()
         self.destroy()
+
+    def reset_default_settings(self):
+        self.user_settings.reset_to_defaults()
+        # need to reset values in all entry fields and the dropdown
 
     def apply_settings(self):
         match self.install_type_fr.get():
@@ -77,26 +88,6 @@ class SettingsWindow(customtkinter.CTkToplevel):
         # fetch current values from settings window
         # and save to self.user_settings
         self.user_settings.save_settings()
-
-
-class ButtonBar(customtkinter.CTkFrame):
-    def __init__(
-        self,
-        master,
-        *,
-        on_cancel: Callable[[], None],
-        on_apply: Callable[[], None],
-        on_ok: Callable[[], None],
-    ):
-        super().__init__(master)
-        self.configure(fg_color="transparent")
-
-        self.cancel_btn = customtkinter.CTkButton(self, text="Cancel", command=on_cancel, width=100)
-        self.cancel_btn.grid(row=0, column=0, padx=(0, 10), pady=0, sticky="w")
-        self.apply_btn = customtkinter.CTkButton(self, text="Apply", command=on_apply, width=100)
-        self.apply_btn.grid(row=0, column=1, padx=(0, 10), pady=0, sticky="e")
-        self.ok_btn = customtkinter.CTkButton(self, text="OK", command=on_ok, width=100)
-        self.ok_btn.grid(row=0, column=2, padx=0, pady=0, sticky="e")
 
 
 class DropdownPicker(customtkinter.CTkFrame):
