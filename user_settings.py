@@ -76,9 +76,6 @@ class UserSettings():
             result.append(path)
         return result
 
-    def __post_init__(self):
-        self.save_settings()
-
     def reset_to_defaults(self):
         # Wipes current settings and re-detects the game paths.
         install_type, game_folder = guess_install_type_and_folder()
@@ -92,14 +89,17 @@ class UserSettings():
 
     @classmethod
     def create_with_defaults(cls) -> "UserSettings":
+        """Build default settings and write them to disk (bootstrap / corrupt-config recovery)."""
         install_type, game_folder = guess_install_type_and_folder()
-        return cls(
+        settings = cls(
             install_type=install_type,
             game_folder=game_folder,
             swap_paths=cls._get_default_swap_paths(game_folder),
             user_protected_paths=cls._get_default_protected_paths(game_folder),
             critical_game_paths=cls._getcritical_game_paths(game_folder),
         )
+        settings.save_settings()
+        return settings
 
     @classmethod
     def load_settings(cls) -> "UserSettings":
@@ -141,7 +141,7 @@ class UserSettings():
                             converted_data[field_name] = cls._get_default_game_folder(install_type)
                         case "swap_paths":
                             converted_data[field_name] = cls._get_default_swap_paths(game_folder)
-                        case "protected_paths":
+                        case "user_protected_paths":
                             converted_data[field_name] = cls._get_default_protected_paths(game_folder)
 
             return cls(critical_game_paths=cls._getcritical_game_paths(game_folder), **converted_data)
@@ -172,9 +172,9 @@ class UserSettings():
     def get_all_protected_paths(self) -> tuple[list[Path], list[Path]]:
         excluded_files = []
         excluded_dirs = []
-        for protected_path in chain[Path](self.user_protected_paths, self.critical_game_paths):
+        for protected_path in chain(self.user_protected_paths, self.critical_game_paths):
             if protected_path.is_file():
                 excluded_files.append(protected_path)
-            if protected_path.is_dir():
+            elif protected_path.is_dir():
                 excluded_dirs.append(protected_path)
         return excluded_files, excluded_dirs

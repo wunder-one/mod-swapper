@@ -57,10 +57,14 @@ class App(customtkinter.CTk):
         else:
             self.settings_window.focus()
 
+    def open_overwrite_dialog(self):
+        # TODO: create overwrite dialog
+        pass
 
 class ProfileFrame(customtkinter.CTkFrame):
-    def __init__(self, master, profile, prof_state: ProfileState, user_settings: UserSettings):
+    def __init__(self, master: App, profile: str, prof_state: ProfileState, user_settings: UserSettings):
         super().__init__(master)
+        self._app: App = master
         self.profile = profile
         self.prof_state = prof_state
         self.user_settings = user_settings
@@ -87,7 +91,7 @@ class ProfileFrame(customtkinter.CTkFrame):
         except Exception as e:
             print(f"Error swapping profiles: {e}")
         # Always update the UI frames to reflect the current state
-        self.master.update_profile_frames() # type: ignore
+        self._app.update_profile_frames()
 
     def set_active_appearance(self, is_active: bool):
         if is_active:
@@ -98,8 +102,9 @@ class ProfileFrame(customtkinter.CTkFrame):
             self.activate_button.configure(state="normal", fg_color=("#3B8ED0", "#1F6AA5"), text="Activate Profile")
 
 class ButtonBar(customtkinter.CTkFrame):
-    def __init__(self, master, profile, prof_state: ProfileState, user_settings: UserSettings):
+    def __init__(self, master: App, profile: list[str], prof_state: ProfileState, user_settings: UserSettings):
         super().__init__(master)
+        self._app: App = master
         self.grid_columnconfigure(2, weight=1)
         self.profile = profile
         self.prof_state = prof_state
@@ -108,10 +113,10 @@ class ButtonBar(customtkinter.CTkFrame):
         self.new_profile_button = customtkinter.CTkButton(self, text="New Profile", command=self.new_profile_callback, width=100)
         self.new_profile_button.grid(row=0, column=0, padx=(6, 0), pady=6)
 
-        self.overwrite_button = customtkinter.CTkButton(self, text="Overwrite Profile", command=self.new_profile_callback, width=100)
+        self.overwrite_button = customtkinter.CTkButton(self, text="Overwrite Profile", command=self._app.open_overwrite_dialog, width=100)
         self.overwrite_button.grid(row=0, column=1, padx=(6, 0), pady=6)
 
-        self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self.master.open_settings_window, width=100)  # type: ignore
+        self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self._app.open_settings_window, width=100)
         self.settings_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
 
 
@@ -123,6 +128,6 @@ class ButtonBar(customtkinter.CTkFrame):
             return
         # print("Input Name:", new_name)
         set_name = create_new_profile(new_name.strip(), self.prof_state, self.user_settings)
-        self.master.refresh_profiles()  # type: ignore
+        self._app.refresh_profiles()
         # print("Created Name:", set_name)
         
