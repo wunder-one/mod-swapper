@@ -21,13 +21,13 @@ class App(customtkinter.CTk):
         self.button_bar = ButtonBar(self, self.profile_list, self.prof_state, self.user_settings)
         self.button_bar.grid(row=0, column=0, pady=(0, 0), columnspan=3, sticky="ew")
         self.button_bar.configure(corner_radius=0)
-        self.create_profile_frames()
+        self.draw_profile_frames()
         
         self.settings_window: SettingsWindow | None = None
 
-    def create_profile_frames(self):
+    def draw_profile_frames(self):
         self.profile_list = list[str](self.prof_state.profiles.keys())
-        for i, profile_name in enumerate[str](self.profile_list):
+        for i, profile_name in enumerate(self.profile_list):
             profile_frame = ProfileFrame(self, profile_name, self.prof_state, self.user_settings)
             left_pad = 10 if i % 3 == 0 else 0
             profile_frame.grid(row=i // 3 + 1, column=i % 3, padx=(left_pad, 10), pady=(10, 0), sticky="nsew")
@@ -47,7 +47,7 @@ class App(customtkinter.CTk):
             frame = self.profile_frames[frame_title]
             frame.destroy()
         self.profile_frames.clear()
-        self.create_profile_frames()
+        self.draw_profile_frames()
 
     def open_settings_window(self):
         if self.settings_window is None or not self.settings_window.winfo_exists():
