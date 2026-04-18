@@ -15,7 +15,7 @@ Mod swapper for Bauldur's Gate 3. Let's you completely replace all mod related f
 #### Core Features
 - [x] Swap between profiles
 - [x] Save current mod setup to a new profile
-- [ ] Customize which folders you are swapping, with common defaults available
+- [x] Customize which folders you are swapping, with common defaults available
 
 #### Additional Planned Features
 - [ ] Populate mods you updated to other profiles

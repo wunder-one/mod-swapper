@@ -220,6 +220,10 @@ class ScrollablePathFrame(customtkinter.CTkScrollableFrame):
         entry_f.grid(row=len(self.list_items), column=0, padx=(2, 0), pady=(2, 0), sticky="nsew")
         self.list_items.append(entry_f)
 
+    def _relayout_path_rows(self) -> None:
+        for i, entry_f in enumerate(self.list_items):
+            entry_f.grid(row=i, column=0, padx=(2, 0), pady=(2, 0), sticky="nsew")
+
     def reset_paths(self, new_list: list[Path]):
         self.list_values = new_list
         for path_entry_fr in reversed(self.list_items):
@@ -252,5 +256,7 @@ class ScrollablePathFrameEntry(customtkinter.CTkFrame):
             except ValueError:
                 pass
         self.destroy()
+        if isinstance(parent, ScrollablePathFrame):
+            parent._relayout_path_rows()
 
 # --- End Path List Editor Classes ---
