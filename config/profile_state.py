@@ -1,7 +1,11 @@
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from constants import PROFILES_SNAPSHOT_DIR, USER_CONFIG_DIR, PROFILE_STATE_FILE
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ProfileState:
@@ -42,5 +46,5 @@ class ProfileState:
         except (json.JSONDecodeError, TypeError) as e:
             # If the file is garbled or missing required fields, 
             # fall back to a fresh default config.
-            print(f"Warning: Failed to load config, using defaults. Error: {e}")
+            logger.warning("Failed to load profile state; using defaults: %s", e)
             return cls()

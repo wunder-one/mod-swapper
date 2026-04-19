@@ -1,11 +1,14 @@
-import subprocess
 import json
+import logging
+import subprocess
 from pathlib import Path
-from shutil import move, rmtree, copy2
+from shutil import move
 
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from constants import PROFILES_SNAPSHOT_DIR, USER_DIR
+
+logger = logging.getLogger(__name__)
 
 
 def mirror_directory(
@@ -14,7 +17,6 @@ def mirror_directory(
         excluded_files: list[Path] | None = None,
         exclude_dirs: list[Path] | None = None,
     ):
-    # print(f"- Mirror Directory {source_dir.name} => {dest_dir.name}")
     command = [
         "robocopy",
         str(source_dir),
@@ -32,19 +34,16 @@ def mirror_directory(
         "/Z",     # restartable mode in case of interruption
         "/NP",    # no progress percentage in output
     ])
-    # print(f"--> {source_dir}(file) --> {dest_dir}")
     result = subprocess.run(command, capture_output=True, text=True)
     # Robocopy exit codes 0-7 are success, 8+ are errors
     if result.returncode >= 8:
         raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stderr}\n{result.stdout}")
 
 def copy_file(src_file: Path, dst_file: Path, excluded_files: list[Path] | None):
-    # print(f"- Copy File {src_file.name} => {dst_file.name}")
     if excluded_files and dst_file in excluded_files:
         raise ValueError("Specified destination is protected")    
     if excluded_files and src_file in excluded_files:
         raise ValueError("Specified source file is protected")
-    # print(f"--> {src_file}(file) --> {dst_file}")
     src_file.copy(dst_file, follow_symlinks=False, preserve_metadata=True)
 
 def get_unique_path(base_path: Path) -> Path:
@@ -110,13 +109,12 @@ def remove_single_files(outgoing_profile: str, incoming_profile: str):
     incoming_sources = {t["source"] for t in incoming_manifest["targets"] if t["type"] == "file"}
     for target in outgoing_manifest.get("targets"):
         if target["type"] == "file" and target["source"] not in incoming_sources:
-            # print("Converting to Path")
             p = Path(target["source"])
-            # print(f"Deleting {p.name}")
+            logger.debug("Removing outgoing-only file: %s", p)
             p.unlink(missing_ok=True)
 
 def load_profile_to_live(profile_name: str, user_settings: UserSettings):
-    # print(f"Running load_profile_to_live for {profile_name}")
+    logger.info("Loading profile to live mods: %s", profile_name)
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     if not profile_folder.exists():
         raise FileNotFoundError(f"No profile folder found for '{profile_name}'")
@@ -132,7 +130,6 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
         storage_path = Path(target["storage"])
         dst_path = Path(target["source"])
         if target["type"] == "directory":
-            # print(f"Restoring {storage_path.name} directory to {dst_path.name}...")
             mirror_directory(
                 storage_path,
                 dst_path,
@@ -140,7 +137,6 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
                 exclude_dirs=excluded_dirs,
             )
         if target["type"] == "file":
-            # print(f"Restoring {storage_path.name} file to {dst_path.name}...")
             copy_file(storage_path, dst_path, excluded_files)
 
 def create_new_profile(profile_name: str, prof_state: ProfileState, user_settings: UserSettings) -> str:
@@ -155,7 +151,7 @@ def create_new_profile(profile_name: str, prof_state: ProfileState, user_setting
 def overwrite_profile(profile_to_overwrite: str, prof_state: ProfileState, user_settings: UserSettings):
     # Delete current profile folder recursively
     profile_to_overwrite_dir = PROFILES_SNAPSHOT_DIR / profile_to_overwrite
-    print(f"Deleting {profile_to_overwrite_dir} recursively...")
+    logger.info("Deleting profile folder recursively: %s", profile_to_overwrite_dir)
     for root, dirs, files in profile_to_overwrite_dir.walk(top_down=False):
         for name in files:
             (root / name).unlink()
@@ -171,12 +167,12 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
     # Validations
     # Check if the selected profile is already active
     if prof_state.active_profile == profile_to_load:
-        print(f"'{profile_to_load}' is already the active profile. No changes made.")
+        logger.info("Profile %r is already active; no swap performed.", profile_to_load)
         raise ValueError("Selected profile is already active.")
     # Check if the profile to load exists in storage
     profile_to_load_dir = PROFILES_SNAPSHOT_DIR / profile_to_load
     if not profile_to_load_dir.exists():
-        print(f"Profile '{profile_to_load}' does not exist in storage. No changes made to live mods.")
+        logger.warning("Profile %r not found in storage.", profile_to_load)
         raise FileNotFoundError(f"Profile '{profile_to_load}' does not exist.")
     # --- End of validations ---
 
@@ -184,39 +180,34 @@ def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings:
     old_profile = prof_state.active_profile
     backup_profile = None
     if not old_profile:
-        print("No active profile found. Backing up current live mods...")
+        logger.info("No active profile; creating backup from current live mods.")
         backup_profile = create_new_profile("Backup Profile", prof_state, user_settings)
-        print(f"New backup profile: {backup_profile}")
+        logger.info("New backup profile: %s", backup_profile)
         old_profile = backup_profile
     else:
-        # print(f"Swapping from {prof_state.active_profile} to {profile_to_load}...")
+        logger.info("Saving current profile %r before swap to %r.", prof_state.active_profile, profile_to_load)
         save_live_to_profile(prof_state.active_profile, user_settings)
-        # print(f"{prof_state.active_profile} saved to profile storage.")
 
     remove_single_files(old_profile, profile_to_load)
 
     # Loading new profile
     try:
         load_profile_to_live(profile_to_load, user_settings)
-        # print(f"{profile_to_load} loaded to live mods.")
         prof_state.active_profile = profile_to_load
         prof_state.save_config()
-        print(f"[SUCCESS] Updated active profile to '{profile_to_load}'")
-        print("------ END OF SWAP ------")
+        logger.info("Swap complete; active profile is now %r.", profile_to_load)
         return prof_state.active_profile   
     except Exception as e:
         try:
-            print("Loading failed, rolling back to old profile...")
+            logger.error("Loading profile %r failed; rolling back.", profile_to_load, exc_info=True)
             rollback_profile = backup_profile or old_profile
-            print(f"Loading {rollback_profile} to Live")
+            logger.info("Restoring live mods from profile %r.", rollback_profile)
             load_profile_to_live(rollback_profile, user_settings)
-            print("Profile loaded. Updating active profile in memory...")
             prof_state.active_profile = rollback_profile
-            print("Active Profiles Saved. Saving updated state to disk...")
             prof_state.save_config()
-            print(f"[RESTORE] Updated active profile to '{rollback_profile}' in config...")
+            logger.warning("Rolled back; active profile is now %r.", rollback_profile)
         except Exception as rollback_error:
-            print(f"Rollback failed: {rollback_error}")
+            logger.critical("Rollback after failed swap also failed.", exc_info=True)
             raise RuntimeError("Critical error: Failed to load new profile and rollback also failed. Live mods may be in an inconsistent state.") from rollback_error
         raise RuntimeError(f"Failed to load profile '{profile_to_load}'. Rolled back.") from e
 

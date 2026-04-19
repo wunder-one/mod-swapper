@@ -1,4 +1,5 @@
 import json
+import logging
 from dataclasses import dataclass, fields, asdict
 from pathlib import Path
 from typing import Literal
@@ -6,6 +7,8 @@ from itertools import chain
 
 from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, USER_DIR, CRITICAL_GAME_FOLDER_PATHS, DEFAULT_STEAM_GAME_FOLDER, DEFAULT_GOG_GAME_FOLDER
 from functions.discover_steam import find_steam_game_install_path
+
+logger = logging.getLogger(__name__)
 
 InstallType = Literal["steam", "gog", "custom"]
 
@@ -27,7 +30,6 @@ class UserSettings():
 
     @staticmethod
     def _get_default_game_folder(install_type) -> Path:
-        # print(f"install_type == {install_type}")
         if install_type == "steam":
             game_folder = DEFAULT_STEAM_GAME_FOLDER
         elif install_type == "gog":
@@ -116,10 +118,7 @@ class UserSettings():
             del allowed_keys["critical_game_paths"]
             filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
 
-            # print(f"Dataclass Values => {cls.__dataclass_fields__.values()}")
             # Convert the list of strings back into a list of Paths
-            # print(f"Filtered Data before converting => {filtered_data}")
-
             converted_data = {}
             default_install_type, default_game_folder = guess_install_type_and_folder()
             install_type = filtered_data.get("install_type", default_install_type)
@@ -152,7 +151,7 @@ class UserSettings():
         except (json.JSONDecodeError, TypeError) as e:
             # If the file is garbled or missing required fields, 
             # fall back to a fresh default config.
-            print(f"Warning: Failed to load config, using defaults. Error: {e}")
+            logger.warning("Failed to load user settings; using defaults: %s", e)
             return cls.create_with_defaults()
         
 

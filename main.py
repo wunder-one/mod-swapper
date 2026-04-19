@@ -1,27 +1,31 @@
+import logging
+
 import ui.app
+from config.logging_setup import configure_logging
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from customtkinter import set_default_color_theme
-from watchpoints import watch
+
+logger = logging.getLogger(__name__)
+
 
 def main():
+    configure_logging()
     prof_state = ProfileState.load_config()
-    watch(prof_state)
     user_settings = UserSettings.load_settings()
-    watch(user_settings)
-    print(f"Active profile from config: {prof_state.active_profile}")
-    print(f"Available profiles: {list(prof_state.profiles.keys())}")
-    print(f"Game Folder: {user_settings.game_folder}")
+    logger.info("Active profile from config: %s", prof_state.active_profile)
+    logger.info("Available profiles: %s", list(prof_state.profiles.keys()))
+    logger.info("Game folder: %s", user_settings.game_folder)
 
     set_default_color_theme("ui/theme.json")
     # set_default_color_theme("green")
     app = ui.app.App(prof_state, user_settings)
     app.mainloop()
 
-    print("Saving configuration...")
+    logger.info("Saving configuration...")
     prof_state.save_config()
     user_settings.save_settings()
-    print("Shutdown complete.")
+    logger.info("Shutdown complete.")
 
 
 if __name__ == "__main__":

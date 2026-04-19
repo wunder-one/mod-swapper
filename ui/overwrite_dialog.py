@@ -1,11 +1,15 @@
+import logging
 import sys
 from tkinter import messagebox
+
 import customtkinter
 
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from functions.file_actions import overwrite_profile
 from ui.wrapping_label import WrappingLabel
+
+logger = logging.getLogger(__name__)
 
 
 class OverwriteDialog(customtkinter.CTkToplevel):
@@ -55,12 +59,12 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         confirm_dialog = messagebox.askyesno("Confirm Overwrite", f"Are you sure you want to overwrite {profile}?")
         if not confirm_dialog:
             return
-        print(f"Overwriting profile: {profile}")
+        logger.info("Overwriting profile: %s", profile)
         try:
             overwrite_profile(profile, self.prof_state, self.user_settings)
             self.destroy()
-        except Exception as e:
-            print(f"Error overwriting profile: {e}")
+        except Exception:
+            logger.exception("Overwrite profile failed.")
 
     def _reapply_windows_titlebar(self) -> None:
         if not self.winfo_exists():

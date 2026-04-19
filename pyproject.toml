@@ -8,5 +8,4 @@ dependencies = [
     "ctklistbox>=1.5",
     "customtkinter>=5.2.2",
     "pyinstaller>=6.19.0",
-    "watchpoints>=0.2.5",
 ]

@@ -198,7 +198,6 @@ class ScrollablePathFrame(customtkinter.CTkScrollableFrame):
         self.list_values = list_values
         self.list_items = []
 
-        # print(f"List Values -> {self.list_values}")
         self.populate_list()
         self.configure(border_width=0, corner_radius=6, fg_color=("gray80", "gray20"))
 

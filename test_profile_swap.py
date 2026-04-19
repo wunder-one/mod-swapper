@@ -1,20 +1,25 @@
 import argparse
+import logging
 
-from poc_file_swap import swap_profiles
+from config.logging_setup import configure_logging
+from config.profile_state import ProfileState
+from config.user_settings import UserSettings
+from functions.file_actions import swap_profiles
+
+logger = logging.getLogger(__name__)
+
 
 def test():
-    # Process arguments
-    parser = argparse.ArgumentParser(description="Test swapping profiles.")
-    parser.add_argument("current_profile", type=str, help="Name of the profile to save to storage")
-    parser.add_argument("profile_to_load", type=str, help="Name of the profile to load")
+    parser = argparse.ArgumentParser(description="Test swapping profiles (loads named profile to live mods).")
+    parser.add_argument("profile_to_load", type=str, help="Profile folder name to activate")
     args = parser.parse_args()
 
+    prof_state = ProfileState.load_config()
+    user_settings = UserSettings.load_settings()
+    swap_profiles(args.profile_to_load, prof_state, user_settings)
+    logger.info("Swap test finished; active profile is %r.", prof_state.active_profile)
 
-    swap_profiles(args.current_profile, args.profile_to_load)
-    print(f"==> Saved live mods to profile '{args.current_profile}'")
-    print(f"==> Loaded profile '{args.profile_to_load}' to live mods")  
-    print('------ END OF TEST ------')
-    print('')
 
 if __name__ == "__main__":
+    configure_logging()
     test()

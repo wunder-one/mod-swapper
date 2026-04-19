@@ -1,23 +1,26 @@
 import argparse
+import logging
 
+from config.logging_setup import configure_logging
+from config.user_settings import UserSettings
 from functions.file_actions import save_live_to_profile
-from user_settings import UserSettings
+
+logger = logging.getLogger(__name__)
+
 
 def test():
-    # Process arguments
-    parser = argparse.ArgumentParser(description="Test the file swapping functionality.")
-    parser.add_argument("profile_name", type=str, help="Name of the profile to save to")
+    parser = argparse.ArgumentParser(description="Test saving live mods into a profile snapshot.")
+    parser.add_argument("profile_name", type=str, help="Name of the profile folder to write")
     args = parser.parse_args()
 
     user_settings = UserSettings.load_settings()
-
     save_live_to_profile(args.profile_name, user_settings)
-    print(f"==> Saved live mods from:")
+    logger.info("Saved live mods from:")
     for p in user_settings.swap_paths:
-        print(f"- Copied {p}")
-    print(f"  -->to profile '{args.profile_name}'")
-    print('------ END OF TEST ------')
-    print('')
+        logger.info("  - %s", p)
+    logger.info("  --> profile %r", args.profile_name)
+
 
 if __name__ == "__main__":
+    configure_logging()
     test()

@@ -1,7 +1,11 @@
+import logging
 import winreg
 from pathlib import Path
 
 from constants import BG3_STEAM_ID
+
+logger = logging.getLogger(__name__)
+
 
 def find_steam_path() -> Path | None:
     # Find steam install location from win registry
@@ -14,9 +18,7 @@ def find_steam_path() -> Path | None:
             steam_path = Path(steam_path_str)
             break
         except FileNotFoundError:
-            print(f"No key at {key_path}")
-            # pass needed for when print() is removed.
-            pass    # key not present, try next path
+            logger.debug("Steam registry key not found: %s", key_path)
     return steam_path
 
 
@@ -51,7 +53,7 @@ def find_steam_game_install_path() -> Path | None:
     if not current_path:
         return None
     target_steam_folder = Path(current_path)
-    print(f"Target steam library folder is {current_path}")
+    logger.debug("Using Steam library folder: %s", current_path)
 
     manifest_path = target_steam_folder / "steamapps" / f"appmanifest_{app_id}.acf"
     if manifest_path.exists():

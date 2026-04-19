@@ -1,3 +1,5 @@
+import logging
+
 import customtkinter
 
 from ui.settings import SettingsWindow
@@ -6,6 +8,9 @@ from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from functions.file_actions import swap_profiles, create_new_profile
 from ui.ui_fuctions import load_window_geometry, save_window_geometry
+
+logger = logging.getLogger(__name__)
+
 
 class App(customtkinter.CTk):
     def __init__(self, prof_state: ProfileState, user_settings: UserSettings):
@@ -51,7 +56,7 @@ class App(customtkinter.CTk):
             frame.set_active_appearance(frame.profile == self.prof_state.active_profile)
 
     def refresh_profiles(self):
-        print("Refreshing profiles...")
+        logger.debug("Refreshing profile list UI.")
         # Clear existing frames
         for frame_title in self.profile_frames:
             frame = self.profile_frames[frame_title]
@@ -104,9 +109,9 @@ class ProfileFrame(customtkinter.CTkFrame):
             swap_profiles(self.profile, self.prof_state, self.user_settings)
             # Success! Play sound or update status here
         except ValueError as e:
-            print(f"Notice: {e}")
-        except Exception as e:
-            print(f"Error swapping profiles: {e}")
+            logger.info("Profile swap skipped: %s", e)
+        except Exception:
+            logger.exception("Profile swap failed.")
         # Always update the UI frames to reflect the current state
         self._app.update_profile_frames()
 
@@ -141,10 +146,9 @@ class ButtonBar(customtkinter.CTkFrame):
         new_profile_dialog = customtkinter.CTkInputDialog(text="This will create a new profile from your currently active mods.\n\nProfile Name:", title="New Profile")
         new_name = new_profile_dialog.get_input()
         if new_name is None or new_name.strip() == "":
-            print("Profile creation cancelled or invalid name entered.")
+            logger.info("New profile dialog cancelled or empty name.")
             return
-        # print("Input Name:", new_name)
         set_name = create_new_profile(new_name.strip(), self.prof_state, self.user_settings)
         self._app.refresh_profiles()
-        # print("Created Name:", set_name)
-        
+        logger.info("Created profile %r.", set_name)
+
