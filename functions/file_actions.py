@@ -150,7 +150,7 @@ def create_new_profile(profile_name: str, prof_state: ProfileState, user_setting
     prof_state.save_config()
     return profile_name
 
-def delete_profile(profile_to_delete: str):
+def delete_profile(profile_to_delete: str, prof_state: ProfileState):
     # Delete current profile folder recursively
     profile_to_delete_dir = PROFILES_SNAPSHOT_DIR / profile_to_delete
     logger.info("Deleting profile folder recursively: %s", profile_to_delete_dir)
@@ -159,14 +159,27 @@ def delete_profile(profile_to_delete: str):
             (root / name).unlink()
         for name in dirs:
             (root / name).rmdir()
+    profile_to_delete_dir.rmdir()
+
+    prof_state.remove_profile(profile_to_delete)
+
+    
 
 def overwrite_profile(profile_to_overwrite: str, prof_state: ProfileState, user_settings: UserSettings):
-    delete_profile(profile_to_overwrite)
+    # Delete current profile folder recursively
+    profile_to_delete_dir = PROFILES_SNAPSHOT_DIR / profile_to_overwrite
+    logger.info("Deleting profile folder recursively: %s", profile_to_delete_dir)
+    for root, dirs, files in profile_to_delete_dir.walk(top_down=False):
+        for name in files:
+            (root / name).unlink()
+        for name in dirs:
+            (root / name).rmdir()
+    profile_to_delete_dir.rmdir()
+    
     save_live_to_profile(profile_to_overwrite, user_settings)
     prof_state.active_profile = profile_to_overwrite
     prof_state.save_config()
     return profile_to_overwrite
-
 
 
 def swap_profiles(profile_to_load: str, prof_state: ProfileState, user_settings: UserSettings):

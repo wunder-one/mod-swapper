@@ -48,3 +48,6 @@ class ProfileState:
             # fall back to a fresh default config.
             logger.warning("Failed to load profile state; using defaults: %s", e)
             return cls()
+
+    def remove_profile(self, profile: str):
+        del self.profiles[profile]
