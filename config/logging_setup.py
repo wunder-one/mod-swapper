@@ -1,6 +1,13 @@
 import logging
 import os
 
+"""
+Commands to use for logging:
+PowerShell: 
+$env:MOD_SWAPPER_LOG = "DEBUG"; uv run python main.py
+Unix: 
+MOD_SWAPPER_LOG=DEBUG uv run python main.py
+"""
 
 def configure_logging() -> None:
     """Configure root logging once (safe to call from main or test entrypoints)."""
