@@ -1,10 +1,6 @@
-from __future__ import annotations
-
 import logging
 import sys
-import threading
 from tkinter import messagebox
-from typing import TYPE_CHECKING
 
 import customtkinter
 
@@ -13,16 +9,12 @@ from config.user_settings import UserSettings
 from functions.file_actions import overwrite_profile
 from ui.wrapping_label import WrappingLabel
 
-if TYPE_CHECKING:
-    from ui.app import App
-
 logger = logging.getLogger(__name__)
 
 
-class OverwriteDialog(customtkinter.CTkToplevel):
+class DeleteDialog(customtkinter.CTkToplevel):
     def __init__(self, master, prof_state: ProfileState, user_settings: UserSettings, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
-        self._app: App = master
         self.prof_state = prof_state
         self.user_settings = user_settings
         self.transient(master)
@@ -34,15 +26,12 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         self.geometry(f"235x{240 + len(self.prof_state.profiles) * 40}")
         self.grid_columnconfigure(0, weight=1)
         # self.grid_rowconfigure(4, weight=1)
-        self.title("Overwrite Profile")
+        self.title("Delete Profile")
 
         self.bind("<Map>", self._on_map)
 
-        self.info_label = WrappingLabel(self, text="Select a profile to overwrite.", fg_color="transparent")
+        self.info_label = WrappingLabel(self, text="Choose a profile to delete.", fg_color="transparent")
         self.info_label.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="new")
-
-        self.info_label = WrappingLabel(self, text="Warning: Overwriting will erase all data in the profile you select.")
-        self.info_label.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="new")
 
         self.profile_button_fr = customtkinter.CTkFrame(self, fg_color="transparent", border_width=2)
         self.profile_button_fr.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
@@ -64,29 +53,15 @@ class OverwriteDialog(customtkinter.CTkToplevel):
 
 
     def _on_profile_button_click(self, profile: str):
-        confirm_dialog = messagebox.askyesno("Confirm Overwrite", f"Are you sure you want to overwrite {profile}?")
+        confirm_dialog = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete {profile}?")
         if not confirm_dialog:
             return
-        logger.info("Overwriting profile: %s", profile)
-
-        self.destroy()
-        self._app.show_progress_bar()
-        self._app.update_idletasks()
-
-        def worker():
-            try:
-                overwrite_profile(profile, self.prof_state, self.user_settings)
-            except ValueError as e:
-                logger.info("Profile overwrite skipped: %s", e)
-            except Exception:
-                logger.exception("Profile overwrite failed.")
-
-            def on_done():
-                self._app.hide_progress_bar()
-                logger.info("Profile %r overwritten.", profile)
-
-            self._app.after(0, on_done)
-        threading.Thread(target=worker, daemon=True).start()
+        logger.info("Deleting profile: %s", profile)
+        try:
+            overwrite_profile(profile, self.prof_state, self.user_settings)
+            self.destroy()
+        except Exception:
+            logger.exception("Overwrite profile failed.")
 
     def _reapply_windows_titlebar(self) -> None:
         if not self.winfo_exists():
