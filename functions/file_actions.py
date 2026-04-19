@@ -17,6 +17,7 @@ def mirror_directory(
         excluded_files: list[Path] | None = None,
         exclude_dirs: list[Path] | None = None,
     ):
+    logger.debug("Mirroring directory: %s to %s", source_dir, dest_dir)
     command = [
         "robocopy",
         str(source_dir),
@@ -40,6 +41,7 @@ def mirror_directory(
         raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stderr}\n{result.stdout}")
 
 def copy_file(src_file: Path, dst_file: Path, excluded_files: list[Path] | None):
+    logger.debug("Copying file: %s to %s", src_file, dst_file)
     if excluded_files and dst_file in excluded_files:
         raise ValueError("Specified destination is protected")    
     if excluded_files and src_file in excluded_files:

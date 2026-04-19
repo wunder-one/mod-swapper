@@ -1,4 +1,5 @@
 import logging
+import threading
 
 import customtkinter
 
@@ -24,15 +25,24 @@ class App(customtkinter.CTk):
         no_of_rows = (len(self.profile_list) - 1) // 3 + 1
         window_geometry = load_window_geometry("app") or {}
 
-        if window_geometry is None:
-            self.geometry(f"{190 * 3}x{52 + 96 * (no_of_rows + 1)}")
-        else:
+        if "winfo_x" in window_geometry and "winfo_y" in window_geometry:
             self.geometry(f"{190 * 3}x{52 + 96 * (no_of_rows + 1)}+{window_geometry['winfo_x']}+{window_geometry['winfo_y']}")
+        else:
+            self.geometry(f"{190 * 3}x{52 + 96 * (no_of_rows + 1)}")
+            
         self.grid_columnconfigure((0, 1, 2), weight=1)
+        # Keep row 1 height when the bar is grid_removed so profile tiles do not jump.
+        # self._progress_bar_grid = dict(row=1, column=0, columnspan=3, padx=0, pady=0, sticky="ew")
+        self.grid_rowconfigure(1, minsize=10)
 
         self.button_bar = ButtonBar(self, self.profile_list, self.prof_state, self.user_settings)
         self.button_bar.grid(row=0, column=0, pady=(0, 0), columnspan=3, sticky="ew")
         self.button_bar.configure(corner_radius=0)
+
+        self.progress_bar = customtkinter.CTkProgressBar(self, orientation="horizontal", mode="indeterminate", corner_radius=0)
+        self.progress_bar.grid(row=1, column=0, columnspan=3, padx=0, pady=0, sticky="ew")
+        self.progress_bar.grid_remove()
+
         self.draw_profile_frames()
         
         self.settings_window: SettingsWindow | None = None
@@ -40,12 +50,23 @@ class App(customtkinter.CTk):
 
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
+        # self.show_progress_bar()
+
+
+    def show_progress_bar(self) -> None:
+        self.progress_bar.grid()
+        self.progress_bar.start()
+
+    def hide_progress_bar(self) -> None:
+        self.progress_bar.stop()
+        self.progress_bar.grid_remove()
+
     def draw_profile_frames(self):
         self.profile_list = list[str](self.prof_state.profiles.keys())
         for i, profile_name in enumerate(self.profile_list):
             profile_frame = ProfileFrame(self, profile_name, self.prof_state, self.user_settings)
             left_pad = 10 if i % 3 == 0 else 0
-            profile_frame.grid(row=i // 3 + 1, column=i % 3, padx=(left_pad, 10), pady=(10, 0), sticky="nsew")
+            profile_frame.grid(row=i // 3 + 2, column=i % 3, padx=(left_pad, 10), pady=(10, 0), sticky="nsew")
             # self.profile_frame.configure(fg_color="transparent")
             self.profile_frames[profile_name] = profile_frame
         self.update_profile_frames()
@@ -105,15 +126,24 @@ class ProfileFrame(customtkinter.CTkFrame):
         self.activate_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
     def activate_button_callback(self):
-        try:
-            swap_profiles(self.profile, self.prof_state, self.user_settings)
-            # Success! Play sound or update status here
-        except ValueError as e:
-            logger.info("Profile swap skipped: %s", e)
-        except Exception:
-            logger.exception("Profile swap failed.")
-        # Always update the UI frames to reflect the current state
-        self._app.update_profile_frames()
+        self._app.show_progress_bar()
+        self._app.update_idletasks()
+
+        def worker():
+            try:
+                swap_profiles(self.profile, self.prof_state, self.user_settings)
+            except ValueError as e:
+                logger.info("Profile swap skipped: %s", e)
+            except Exception:
+                logger.exception("Profile swap failed.")
+
+            def on_done():
+                self._app.update_profile_frames()
+                self._app.hide_progress_bar()
+
+            self._app.after(0, on_done)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def set_active_appearance(self, is_active: bool):
         if is_active:
@@ -148,7 +178,21 @@ class ButtonBar(customtkinter.CTkFrame):
         if new_name is None or new_name.strip() == "":
             logger.info("New profile dialog cancelled or empty name.")
             return
-        set_name = create_new_profile(new_name.strip(), self.prof_state, self.user_settings)
-        self._app.refresh_profiles()
-        logger.info("Created profile %r.", set_name)
+        self._app.show_progress_bar()
+        self._app.update_idletasks()
 
+        def worker():
+            try:
+                set_name = create_new_profile(new_name.strip(), self.prof_state, self.user_settings)
+            except ValueError as e:
+                logger.info("Profile creation skipped: %s", e)
+            except Exception:
+                logger.exception("Profile creation failed.")
+
+            def on_done():
+                self._app.refresh_profiles()    
+                logger.info("Created profile %r.", set_name)
+                self._app.hide_progress_bar()
+
+            self._app.after(0, on_done)
+        threading.Thread(target=worker, daemon=True).start()
