@@ -1,22 +1,26 @@
+from __future__ import annotations
+
 import logging
 import sys
 from tkinter import messagebox
+from typing import TYPE_CHECKING
 
 import customtkinter
 
 from config.profile_state import ProfileState
-from config.user_settings import UserSettings
-from functions.file_actions import overwrite_profile
 from ui.wrapping_label import WrappingLabel
+
+if TYPE_CHECKING:
+    from ui.app import App
 
 logger = logging.getLogger(__name__)
 
 
 class DeleteDialog(customtkinter.CTkToplevel):
-    def __init__(self, master, prof_state: ProfileState, user_settings: UserSettings, *args, **kwargs):
+    def __init__(self, master: App, prof_state: ProfileState, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
+        self._app: App = master
         self.prof_state = prof_state
-        self.user_settings = user_settings
         self.transient(master)
         # transient() runs after CTk's initial title-bar setup; on Windows 10/11 that resets DWM
         # immersive dark mode for this HWND — re-run the same hook CTk uses in __init__ / resizable.
@@ -43,6 +47,8 @@ class DeleteDialog(customtkinter.CTkToplevel):
                 text=profile,
                 command=lambda p=profile: self._on_profile_button_click(p),
             )
+            if profile == self.prof_state.active_profile:
+                profile_button.configure(state="disabled")
             if index == 0:
                 profile_button.grid(row=2 + index, column=0, padx=10, pady=10, sticky="ew")
             else:
@@ -57,11 +63,9 @@ class DeleteDialog(customtkinter.CTkToplevel):
         if not confirm_dialog:
             return
         logger.info("Deleting profile: %s", profile)
-        try:
-            overwrite_profile(profile, self.prof_state, self.user_settings)
-            self.destroy()
-        except Exception:
-            logger.exception("Overwrite profile failed.")
+        app = self._app
+        self.destroy()
+        app.delete_profile_async(profile)
 
     def _reapply_windows_titlebar(self) -> None:
         if not self.winfo_exists():

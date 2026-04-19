@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import threading
 
@@ -5,9 +7,10 @@ import customtkinter
 
 from ui.settings import SettingsWindow
 from ui.overwrite_dialog import OverwriteDialog
+from ui.delete_dialog import DeleteDialog
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
-from functions.file_actions import swap_profiles, create_new_profile
+from functions.file_actions import swap_profiles, create_new_profile, delete_profile
 from ui.ui_fuctions import load_window_geometry, save_window_geometry
 
 logger = logging.getLogger(__name__)
@@ -18,8 +21,8 @@ class App(customtkinter.CTk):
         super().__init__()
         self.prof_state = prof_state
         self.user_settings = user_settings
-        self.profile_list = list[str](self.prof_state.profiles.keys())
-        self.profile_frames = {}
+        self.profile_list: list[str] = list(self.prof_state.profiles.keys())
+        self.profile_frames: dict[str, ProfileFrame] = {}
 
         self.title("BG3 Profile Swapper") 
         no_of_rows = (len(self.profile_list) - 1) // 3 + 1
@@ -35,7 +38,7 @@ class App(customtkinter.CTk):
         # self._progress_bar_grid = dict(row=1, column=0, columnspan=3, padx=0, pady=0, sticky="ew")
         self.grid_rowconfigure(1, minsize=10)
 
-        self.button_bar = ButtonBar(self, self.profile_list, self.prof_state, self.user_settings)
+        self.button_bar = ButtonBar(self)
         self.button_bar.grid(row=0, column=0, pady=(0, 0), columnspan=3, sticky="ew")
         self.button_bar.configure(corner_radius=0)
 
@@ -47,6 +50,7 @@ class App(customtkinter.CTk):
         
         self.settings_window: SettingsWindow | None = None
         self.overwrite_dialog: OverwriteDialog | None = None
+        self.delete_dialog: DeleteDialog | None = None
 
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -62,9 +66,9 @@ class App(customtkinter.CTk):
         self.progress_bar.grid_remove()
 
     def draw_profile_frames(self):
-        self.profile_list = list[str](self.prof_state.profiles.keys())
+        self.profile_list = list(self.prof_state.profiles.keys())
         for i, profile_name in enumerate(self.profile_list):
-            profile_frame = ProfileFrame(self, profile_name, self.prof_state, self.user_settings)
+            profile_frame = ProfileFrame(self, profile_name)
             left_pad = 10 if i % 3 == 0 else 0
             profile_frame.grid(row=i // 3 + 2, column=i % 3, padx=(left_pad, 10), pady=(10, 0), sticky="nsew")
             # self.profile_frame.configure(fg_color="transparent")
@@ -100,17 +104,92 @@ class App(customtkinter.CTk):
             self.overwrite_dialog.lift()
             self.overwrite_dialog.focus_set()
 
+    def open_delete_dialog(self):
+        if self.delete_dialog is None or not self.delete_dialog.winfo_exists():
+            self.delete_dialog = DeleteDialog(self, self.prof_state)
+        else:
+            self.delete_dialog.lift()
+            self.delete_dialog.focus_set()
+
+    def new_profile_callback(self):
+        new_profile_dialog = customtkinter.CTkInputDialog(
+            text="This will create a new profile from your currently active mods.\n\nProfile Name:",
+            title="New Profile",
+        )
+        new_name = new_profile_dialog.get_input()
+        if new_name is None or new_name.strip() == "":
+            logger.info("New profile dialog cancelled or empty name.")
+            return
+        self.show_progress_bar()
+        self.update_idletasks()
+
+        def worker():
+            set_name = None
+            try:
+                set_name = create_new_profile(new_name.strip(), self.prof_state, self.user_settings)
+            except ValueError as e:
+                logger.info("Profile creation skipped: %s", e)
+            except Exception:
+                logger.exception("Profile creation failed.")
+
+            def on_done():
+                self.refresh_profiles()
+                if set_name is not None:
+                    logger.info("Created profile %r.", set_name)
+                self.hide_progress_bar()
+
+            self.after(0, on_done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def delete_profile_async(self, profile: str):
+        self.show_progress_bar()
+        self.update_idletasks()
+
+        def worker():
+            try:
+                delete_profile(profile, self.prof_state)
+                logger.info("Profile %r deleted.", profile)
+            except Exception:
+                logger.exception("Profile deletion failed.")
+
+            def on_done():
+                self.refresh_profiles()
+                self.hide_progress_bar()
+
+            self.after(0, on_done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def activate_profile_callback(self, profile: str):
+        self.show_progress_bar()
+        self.update_idletasks()
+
+        def worker():
+            try:
+                swap_profiles(profile, self.prof_state, self.user_settings)
+            except ValueError as e:
+                logger.info("Profile swap skipped: %s", e)
+            except Exception:
+                logger.exception("Profile swap failed.")
+
+            def on_done():
+                self.update_profile_frames()
+                self.hide_progress_bar()
+
+            self.after(0, on_done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def on_close(self):
         save_window_geometry("app", winfo_x=self.winfo_x(), winfo_y=self.winfo_y())
         self.quit()
 
 class ProfileFrame(customtkinter.CTkFrame):
-    def __init__(self, master: App, profile: str, prof_state: ProfileState, user_settings: UserSettings):
+    def __init__(self, master: App, profile: str):
         super().__init__(master)
         self._app: App = master
         self.profile = profile
-        self.prof_state = prof_state
-        self.user_settings = user_settings
 
         # Setup grid
         self.grid_columnconfigure(0, weight=1)
@@ -122,28 +201,12 @@ class ProfileFrame(customtkinter.CTkFrame):
         self.title.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
 
         # Profile action buttons
-        self.activate_button = customtkinter.CTkButton(self, text="Activate Profile", command=self.activate_button_callback)
+        self.activate_button = customtkinter.CTkButton(
+            self,
+            text="Activate Profile",
+            command=lambda p=self.profile: self._app.activate_profile_callback(p),
+        )
         self.activate_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
-
-    def activate_button_callback(self):
-        self._app.show_progress_bar()
-        self._app.update_idletasks()
-
-        def worker():
-            try:
-                swap_profiles(self.profile, self.prof_state, self.user_settings)
-            except ValueError as e:
-                logger.info("Profile swap skipped: %s", e)
-            except Exception:
-                logger.exception("Profile swap failed.")
-
-            def on_done():
-                self._app.update_profile_frames()
-                self._app.hide_progress_bar()
-
-            self._app.after(0, on_done)
-
-        threading.Thread(target=worker, daemon=True).start()
 
     def set_active_appearance(self, is_active: bool):
         if is_active:
@@ -154,45 +217,20 @@ class ProfileFrame(customtkinter.CTkFrame):
             self.activate_button.configure(state="normal", fg_color=("#3B8ED0", "#1F6AA5"), text="Activate Profile")
 
 class ButtonBar(customtkinter.CTkFrame):
-    def __init__(self, master: App, profile: list[str], prof_state: ProfileState, user_settings: UserSettings):
+    def __init__(self, master: App) -> None:
         super().__init__(master)
         self._app: App = master
         self.grid_columnconfigure(2, weight=1)
-        self.profile = profile
-        self.prof_state = prof_state
-        self.user_settings = user_settings
 
-        self.new_profile_button = customtkinter.CTkButton(self, text="New Profile", command=self.new_profile_callback, width=100)
+        self.new_profile_button = customtkinter.CTkButton(self, text="New Profile", command=self._app.new_profile_callback, width=100)
         self.new_profile_button.grid(row=0, column=0, padx=(6, 0), pady=6)
 
         self.overwrite_button = customtkinter.CTkButton(self, text="Overwrite Profile", command=self._app.open_overwrite_dialog, width=100)
         self.overwrite_button.grid(row=0, column=1, padx=(6, 0), pady=6)
 
+        self.delete_button = customtkinter.CTkButton(self, text="Delete Profile", command=self._app.open_delete_dialog, width=100)
+        self.delete_button.grid(row=0, column=2, padx=(6, 0), pady=6)
+
         self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self._app.open_settings_window, width=100)
         self.settings_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
 
-
-    def new_profile_callback(self):
-        new_profile_dialog = customtkinter.CTkInputDialog(text="This will create a new profile from your currently active mods.\n\nProfile Name:", title="New Profile")
-        new_name = new_profile_dialog.get_input()
-        if new_name is None or new_name.strip() == "":
-            logger.info("New profile dialog cancelled or empty name.")
-            return
-        self._app.show_progress_bar()
-        self._app.update_idletasks()
-
-        def worker():
-            try:
-                set_name = create_new_profile(new_name.strip(), self.prof_state, self.user_settings)
-            except ValueError as e:
-                logger.info("Profile creation skipped: %s", e)
-            except Exception:
-                logger.exception("Profile creation failed.")
-
-            def on_done():
-                self._app.refresh_profiles()    
-                logger.info("Created profile %r.", set_name)
-                self._app.hide_progress_bar()
-
-            self._app.after(0, on_done)
-        threading.Thread(target=worker, daemon=True).start()
