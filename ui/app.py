@@ -5,6 +5,7 @@ from ui.overwrite_dialog import OverwriteDialog
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from functions.file_actions import swap_profiles, create_new_profile
+from ui.ui_fuctions import load_window_geometry, save_window_geometry
 
 class App(customtkinter.CTk):
     def __init__(self, prof_state: ProfileState, user_settings: UserSettings):
@@ -14,9 +15,14 @@ class App(customtkinter.CTk):
         self.profile_list = list[str](self.prof_state.profiles.keys())
         self.profile_frames = {}
 
-        self.title("BG3 Profile Swapper")
+        self.title("BG3 Profile Swapper") 
         no_of_rows = (len(self.profile_list) - 1) // 3 + 1
-        self.geometry(f"{190 * 3}x{52 + 96 * (no_of_rows + 1)}")
+        window_geometry = load_window_geometry("app") or {}
+
+        if window_geometry is None:
+            self.geometry(f"{190 * 3}x{52 + 96 * (no_of_rows + 1)}")
+        else:
+            self.geometry(f"{190 * 3}x{52 + 96 * (no_of_rows + 1)}+{window_geometry['winfo_x']}+{window_geometry['winfo_y']}")
         self.grid_columnconfigure((0, 1, 2), weight=1)
 
         self.button_bar = ButtonBar(self, self.profile_list, self.prof_state, self.user_settings)
@@ -26,6 +32,8 @@ class App(customtkinter.CTk):
         
         self.settings_window: SettingsWindow | None = None
         self.overwrite_dialog: OverwriteDialog | None = None
+
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def draw_profile_frames(self):
         self.profile_list = list[str](self.prof_state.profiles.keys())
@@ -65,6 +73,10 @@ class App(customtkinter.CTk):
         else:
             self.overwrite_dialog.lift()
             self.overwrite_dialog.focus_set()
+
+    def on_close(self):
+        save_window_geometry("app", winfo_x=self.winfo_x(), winfo_y=self.winfo_y())
+        self.quit()
 
 class ProfileFrame(customtkinter.CTkFrame):
     def __init__(self, master: App, profile: str, prof_state: ProfileState, user_settings: UserSettings):

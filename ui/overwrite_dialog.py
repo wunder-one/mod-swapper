@@ -1,4 +1,5 @@
 import sys
+from tkinter import messagebox
 import customtkinter
 
 from config.profile_state import ProfileState
@@ -18,7 +19,7 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         if sys.platform == "win32":
             self.after(10, self._reapply_windows_titlebar)
         # self.geometry("235x500")
-        self.geometry(f"235x{210 + len(self.prof_state.profiles) * 40}")
+        self.geometry(f"235x{240 + len(self.prof_state.profiles) * 40}")
         self.grid_columnconfigure(0, weight=1)
         # self.grid_rowconfigure(4, weight=1)
         self.title("Overwrite Profile")
@@ -31,15 +32,30 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         self.info_label = WrappingLabel(self, text="Warning: Overwriting will erase all data in the profile you select.")
         self.info_label.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="new")
 
+        self.profile_button_fr = customtkinter.CTkFrame(self, fg_color="transparent", border_width=2)
+        self.profile_button_fr.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.profile_button_fr.grid_columnconfigure(0, weight=1)
+
         for index, profile in enumerate(self.prof_state.profiles.keys()):
-            profile_button = customtkinter.CTkButton(self, text=profile, command=lambda: self._on_profile_button_click(profile))
-            profile_button.grid(row=2 + index, column=0, padx=20, pady=(10, 0), sticky="ew")
+            profile_button = customtkinter.CTkButton(
+                self.profile_button_fr,
+                text=profile,
+                command=lambda p=profile: self._on_profile_button_click(p),
+            )
+            if index == 0:
+                profile_button.grid(row=2 + index, column=0, padx=10, pady=10, sticky="ew")
+            else:
+                profile_button.grid(row=2 + index, column=0, padx=10, pady=(0, 10), sticky="ew")
 
         self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
         self.cancel_button.grid(row=2 + len(self.prof_state.profiles), column=0, padx=20, pady=(40, 20), sticky="ew")
 
 
     def _on_profile_button_click(self, profile: str):
+        confirm_dialog = messagebox.askyesno("Confirm Overwrite", f"Are you sure you want to overwrite {profile}?")
+        if not confirm_dialog:
+            return
+        print(f"Overwriting profile: {profile}")
         try:
             overwrite_profile(profile, self.prof_state, self.user_settings)
             self.destroy()
