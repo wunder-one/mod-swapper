@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 from itertools import chain
 
-from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, USER_DIR, CRITICAL_GAME_FOLDER_PATHS, DEFAULT_STEAM_GAME_FOLDER, DEFAULT_GOG_GAME_FOLDER
+from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, CRITICAL_GAME_FOLDER_PATHS, LOCAL_APPDATA
 from functions.discover_steam import find_steam_game_install_path
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,6 @@ def guess_install_type_and_folder() -> tuple[InstallType, Path | None]:
     if steam_path:
         return "steam", steam_path
     # TODO: logic for GOG install
-    # Setting game type to steam for testing
     return "custom", None
 
 @dataclass
@@ -29,23 +28,10 @@ class UserSettings():
     critical_game_paths: list[Path]
 
     @staticmethod
-    def _get_default_game_folder(install_type) -> Path:
-        if install_type == "steam":
-            game_folder = DEFAULT_STEAM_GAME_FOLDER
-        elif install_type == "gog":
-            game_folder = DEFAULT_GOG_GAME_FOLDER
-        else:
-            raise ValueError(f"Cannot provide default folder path without install type")
-        if not game_folder.exists():
-            raise FileNotFoundError(f"Game folder not found at {game_folder}. Please check the path and try again.")
-        return game_folder
-
-    @staticmethod
     def _get_default_swap_paths(game_folder: Path | None) -> list[Path]:
-        test_folder_root = USER_DIR / "Desktop" / "Mod Swapper Test Folder"
         app_data_paths = [
-            test_folder_root / "Mods",
-            test_folder_root / "modsettings.lsx",
+            LOCAL_APPDATA / "Larian Studios" / "Baldur's Gate 3" / "Mods", # C:\Users\wes\AppData\Local\Larian Studios\Baldur's Gate 3\Mods
+            LOCAL_APPDATA / "Larian Studios" / "Baldur's Gate 3" / "PlayerProfiles" / "Public" / "modsettings.lsx",
         ]
         if not game_folder:
             return app_data_paths
@@ -123,6 +109,7 @@ class UserSettings():
             default_install_type, default_game_folder = guess_install_type_and_folder()
             install_type = filtered_data.get("install_type", default_install_type)
             game_folder = Path(filtered_data.get("game_folder", default_game_folder))
+            # TODO: add logic to ask for game folder if not found
             for field_name, field_type in allowed_keys.items():
                 if field_name in filtered_data:
                     value = filtered_data[field_name]
@@ -135,9 +122,9 @@ class UserSettings():
                 else:
                     match field_name:
                         case "install_type":
-                            converted_data[field_name] = default_install_type
+                            converted_data[field_name] = install_type
                         case "game_folder":
-                            converted_data[field_name] = cls._get_default_game_folder(install_type)
+                            converted_data[field_name] = game_folder
                         case "swap_paths":
                             converted_data[field_name] = cls._get_default_swap_paths(game_folder)
                         case "user_protected_paths":
