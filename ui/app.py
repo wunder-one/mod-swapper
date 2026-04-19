@@ -29,7 +29,7 @@ class App(customtkinter.CTk):
         window_geometry = load_window_geometry("app") or {}
 
         if "winfo_x" in window_geometry and "winfo_y" in window_geometry:
-            self.geometry(f"{190 * 3}x{52 + 96 * (no_of_rows + 1)}+{window_geometry['winfo_x']}+{window_geometry['winfo_y']}")
+            self.geometry(f"{220 * 3}x{52 + 96 * (no_of_rows + 1)}+{window_geometry['winfo_x']}+{window_geometry['winfo_y']}")
         else:
             self.geometry(f"{190 * 3}x{52 + 96 * (no_of_rows + 1)}")
             
@@ -80,6 +80,11 @@ class App(customtkinter.CTk):
             frame = self.profile_frames[frame_title]
             frame.set_active_appearance(frame.profile == self.prof_state.active_profile)
 
+    def get_child_window_location(self, child_width: int, child_height: int) -> tuple[int, int]:
+        x = self.winfo_x() + (self.winfo_width() // 2) - (child_width // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (child_height // 2)
+        return x, y
+
     def refresh_profiles(self):
         logger.debug("Refreshing profile list UI.")
         # Clear existing frames
@@ -112,10 +117,12 @@ class App(customtkinter.CTk):
             self.delete_dialog.focus_set()
 
     def new_profile_callback(self):
+        win_x, win_y = self.get_child_window_location(340, 230)
         new_profile_dialog = customtkinter.CTkInputDialog(
             text="This will create a new profile from your currently active mods.\n\nProfile Name:",
             title="New Profile",
         )
+        new_profile_dialog.geometry(f"+{win_x}+{win_y}")
         new_name = new_profile_dialog.get_input()
         if new_name is None or new_name.strip() == "":
             logger.info("New profile dialog cancelled or empty name.")
@@ -174,7 +181,8 @@ class App(customtkinter.CTk):
                 logger.exception("Profile swap failed.")
 
             def on_done():
-                self.update_profile_frames()
+                # Full redraw so a swap-created backup profile appears in the grid (Tk: main thread only).
+                self.refresh_profiles()
                 self.hide_progress_bar()
 
             self.after(0, on_done)
@@ -220,7 +228,7 @@ class ButtonBar(customtkinter.CTkFrame):
     def __init__(self, master: App) -> None:
         super().__init__(master)
         self._app: App = master
-        self.grid_columnconfigure(2, weight=1)
+        self.grid_columnconfigure(3, weight=1)
 
         self.new_profile_button = customtkinter.CTkButton(self, text="New Profile", command=self._app.new_profile_callback, width=100)
         self.new_profile_button.grid(row=0, column=0, padx=(6, 0), pady=6)
@@ -232,5 +240,5 @@ class ButtonBar(customtkinter.CTkFrame):
         self.delete_button.grid(row=0, column=2, padx=(6, 0), pady=6)
 
         self.settings_button = customtkinter.CTkButton(self, text="Settings", command=self._app.open_settings_window, width=100)
-        self.settings_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
+        self.settings_button.grid(row=0, column=4, padx=(0, 6), pady=6, sticky="e")
 

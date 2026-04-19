@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Callable
 
 import customtkinter
 from tkinter import filedialog
+from typing import TYPE_CHECKING
 
 from config.user_settings import UserSettings
+
+if TYPE_CHECKING:
+    from ui.app import App
 
 def bind_entry_show_path_tail(entry: customtkinter.CTkEntry, include_keyrelease: bool = False) -> None:
     # Keep long path entries scrolled to the right end.
@@ -17,9 +23,13 @@ def bind_entry_show_path_tail(entry: customtkinter.CTkEntry, include_keyrelease:
     _scroll_to_end()
 
 class SettingsWindow(customtkinter.CTkToplevel):
-    def __init__(self, master, user_settings: UserSettings, *args, **kwargs):
+    def __init__(self, master: App, user_settings: UserSettings, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
-        self.geometry("800x500")
+        self._app: App = master
+        win_width = 800
+        win_height = 500
+        win_x, win_y = self._app.get_child_window_location(win_width, win_height)
+        self.geometry(f"{win_width}x{win_height}+{win_x}+{win_y}")
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(4, weight=1)
         self.title("Settings")

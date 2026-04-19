@@ -30,8 +30,10 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         # immersive dark mode for this HWND — re-run the same hook CTk uses in __init__ / resizable.
         if sys.platform == "win32":
             self.after(10, self._reapply_windows_titlebar)
-        # self.geometry("235x500")
-        self.geometry(f"235x{240 + len(self.prof_state.profiles) * 40}")
+        win_width = 235
+        win_height = 240 + len(self.prof_state.profiles) * 40
+        win_x, win_y = self._app.get_child_window_location(win_width, win_height)
+        self.geometry(f"{win_width}x{win_height}+{win_x}+{win_y}")
         self.grid_columnconfigure(0, weight=1)
         # self.grid_rowconfigure(4, weight=1)
         self.title("Overwrite Profile")
@@ -41,8 +43,8 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         self.info_label = WrappingLabel(self, text="Select a profile to overwrite.", fg_color="transparent")
         self.info_label.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="new")
 
-        self.info_label = WrappingLabel(self, text="Warning: Overwriting will erase all data in the profile you select.")
-        self.info_label.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="new")
+        self.warning_label = WrappingLabel(self, text="Warning: Overwriting will erase all data in the profile you select.")
+        self.warning_label.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="new")
 
         self.profile_button_fr = customtkinter.CTkFrame(self, fg_color="transparent", border_width=2)
         self.profile_button_fr.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")

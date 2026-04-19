@@ -1,6 +1,7 @@
 import json
 import logging
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from shutil import move
 
@@ -141,13 +142,20 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
         if target["type"] == "file":
             copy_file(storage_path, dst_path, excluded_files)
 
-def create_new_profile(profile_name: str, prof_state: ProfileState, user_settings: UserSettings) -> str:
+def create_new_profile(
+    profile_name: str,
+    prof_state: ProfileState,
+    user_settings: UserSettings,
+    refresh_profiles: Callable[[], None] | None = None,
+) -> str:
     unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
     unique_dir.mkdir(parents=True, exist_ok=False)
     profile_name = unique_dir.name
     save_live_to_profile(profile_name, user_settings)
     prof_state.active_profile = profile_name
     prof_state.save_config()
+    if refresh_profiles is not None:
+        refresh_profiles()
     return profile_name
 
 def delete_profile(profile_to_delete: str, prof_state: ProfileState):

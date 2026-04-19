@@ -26,16 +26,21 @@ class DeleteDialog(customtkinter.CTkToplevel):
         # immersive dark mode for this HWND — re-run the same hook CTk uses in __init__ / resizable.
         if sys.platform == "win32":
             self.after(10, self._reapply_windows_titlebar)
-        # self.geometry("235x500")
-        self.geometry(f"235x{240 + len(self.prof_state.profiles) * 40}")
+        win_width = 235
+        win_height = 260 + len(self.prof_state.profiles) * 40
+        win_x, win_y = self._app.get_child_window_location(win_width, win_height)
+        self.geometry(f"{win_width}x{win_height}+{win_x}+{win_y}")
         self.grid_columnconfigure(0, weight=1)
         # self.grid_rowconfigure(4, weight=1)
         self.title("Delete Profile")
 
         self.bind("<Map>", self._on_map)
 
-        self.info_label = WrappingLabel(self, text="Choose a profile to delete.", fg_color="transparent")
+        self.info_label = WrappingLabel(self, text="Choose a profile to delete.\n\nThis action cannot be undone.", fg_color="transparent")
         self.info_label.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="new")
+
+        self.active_profile_note = WrappingLabel(self, text="You cannot delete the active profile.")
+        self.active_profile_note.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="new")
 
         self.profile_button_fr = customtkinter.CTkFrame(self, fg_color="transparent", border_width=2)
         self.profile_button_fr.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
@@ -48,7 +53,7 @@ class DeleteDialog(customtkinter.CTkToplevel):
                 command=lambda p=profile: self._on_profile_button_click(p),
             )
             if profile == self.prof_state.active_profile:
-                profile_button.configure(state="disabled")
+                profile_button.configure(state="disabled", fg_color=("#F9F9FA", "#343638"))
             if index == 0:
                 profile_button.grid(row=2 + index, column=0, padx=10, pady=10, sticky="ew")
             else:
