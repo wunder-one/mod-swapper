@@ -1,4 +1,6 @@
 import logging
+import sys
+from pathlib import Path
 
 import ui.app
 from config.logging_setup import configure_logging
@@ -9,6 +11,13 @@ from customtkinter import set_default_color_theme
 logger = logging.getLogger(__name__)
 
 
+def _default_theme_path() -> str:
+    meipass = getattr(sys, "_MEIPASS", None)
+    if getattr(sys, "frozen", False) and meipass is not None:
+        return str(Path(meipass) / "ui" / "theme.json")
+    return "ui/theme.json"
+
+
 def main():
     configure_logging()
     prof_state = ProfileState.load_config()
@@ -17,7 +26,7 @@ def main():
     logger.info("Available profiles: %s", list(prof_state.profiles.keys()))
     logger.info("Game folder: %s", user_settings.game_folder)
 
-    set_default_color_theme("ui/theme.json")
+    set_default_color_theme(_default_theme_path())
     # set_default_color_theme("green")
     app = ui.app.App(prof_state, user_settings)
     app.mainloop()
