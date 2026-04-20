@@ -1,3 +1,10 @@
+from pathlib import Path
+import sys
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 import argparse
 import logging
 
@@ -8,8 +15,10 @@ from functions.file_actions import save_live_to_profile
 logger = logging.getLogger(__name__)
 
 
-def test():
-    parser = argparse.ArgumentParser(description="Test saving live mods into a profile snapshot.")
+def scratch():
+    parser = argparse.ArgumentParser(
+        description="Scratch: save live mods into a profile snapshot.",
+    )
     parser.add_argument("profile_name", type=str, help="Name of the profile folder to write")
     args = parser.parse_args()
 
@@ -23,4 +32,4 @@ def test():
 
 if __name__ == "__main__":
     configure_logging()
-    test()
+    scratch()

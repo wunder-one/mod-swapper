@@ -1,3 +1,10 @@
+from pathlib import Path
+import sys
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 import argparse
 import logging
 
@@ -8,8 +15,10 @@ from functions.file_actions import load_profile_to_live
 logger = logging.getLogger(__name__)
 
 
-def test():
-    parser = argparse.ArgumentParser(description="Test loading a profile snapshot into live mod paths.")
+def scratch():
+    parser = argparse.ArgumentParser(
+        description="Scratch: load a profile snapshot into live mod paths.",
+    )
     parser.add_argument("profile_name", type=str, help="Profile folder name to load")
     args = parser.parse_args()
 
@@ -22,4 +31,4 @@ def test():
 
 if __name__ == "__main__":
     configure_logging()
-    test()
+    scratch()
