@@ -1,0 +1,37 @@
+# CircleCI 2.1 reference: https://circleci.com/docs/reference/configuration-reference
+version: 2.1
+
+executors:
+  python:
+    docker:
+      - image: cimg/python:3.14
+
+jobs:
+  lint:
+    executor: python
+    steps:
+      - checkout
+      - run:
+          name: Install Ruff
+          command: pip install --upgrade pip && pip install ruff
+      - run:
+          name: Lint
+          command: ruff check .
+
+  test:
+    executor: python
+    steps:
+      - checkout
+      - run:
+          name: Install project and pytest
+          command: pip install --upgrade pip && pip install pytest && pip install .
+      - run:
+          name: Run tests
+          # Exit 5 = no tests collected (valid until the suite grows again).
+          command: pytest || [ $? -eq 5 ]
+
+workflows:
+  ci:
+    jobs:
+      - lint
+      - test
