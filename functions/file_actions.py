@@ -35,8 +35,15 @@ def mirror_directory(
         "/FFT",   # use FAT file times (2-second tolerance, more reliable)
         "/Z",     # restartable mode in case of interruption
         "/NP",    # no progress percentage in output
+        # Robocopy defaults are /R:1000000 /W:30 — a locked file can look hung for hours.
+        "/R:10",  # retry failed copies a bounded number of times
+        "/W:2",   # seconds between retries
     ])
-    result = subprocess.run(command, capture_output=True, text=True)
+    run_kw: dict = {}
+    if hasattr(subprocess, "CREATE_NO_WINDOW"):
+        # Avoid flashing console windows when packaged as a windowed (pythonw) app.
+        run_kw["creationflags"] = subprocess.CREATE_NO_WINDOW
+    result = subprocess.run(command, capture_output=True, text=True, **run_kw)
     # Robocopy exit codes 0-7 are success, 8+ are errors
     if result.returncode >= 8:
         raise RuntimeError(f"Robocopy failed with exit code {result.returncode}\n{result.stderr}\n{result.stdout}")
