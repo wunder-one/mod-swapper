@@ -11,12 +11,11 @@ from customtkinter import set_default_color_theme
 logger = logging.getLogger(__name__)
 
 
-def _default_theme_path() -> str:
+def _meipass_path(relative_path: str) -> str:
     meipass = getattr(sys, "_MEIPASS", None)
     if getattr(sys, "frozen", False) and meipass is not None:
-        return str(Path(meipass) / "ui" / "theme.json")
-    return "ui/theme.json"
-
+        return str(Path(meipass) / relative_path)
+    return relative_path
 
 def main():
     configure_logging()
@@ -26,9 +25,10 @@ def main():
     logger.info("Available profiles: %s", list(prof_state.profiles.keys()))
     logger.info("Game folder: %s", user_settings.game_folder)
 
-    set_default_color_theme(_default_theme_path())
+    set_default_color_theme(_meipass_path("ui/theme.json"))
     # set_default_color_theme("green")
     app = ui.app.App(prof_state, user_settings)
+    app.iconbitmap(_meipass_path("assets/icons/magic_icon.ico"))
     app.mainloop()
 
     logger.info("Saving configuration...")

@@ -1,5 +1,6 @@
 untracked/
 unused/
+previous_builds/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
