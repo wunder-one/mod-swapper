@@ -68,10 +68,17 @@ def get_unique_path(base_path: Path) -> Path:
             return new_path
         counter += 1
 
+def create_missing_folders(swap_paths: list[Path]):
+    for path in swap_paths:
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+            logger.debug("Created missing folder: %s", path)
+
 def save_live_to_profile(profile_name: str, user_settings: UserSettings):
     # Create profile folder if needed
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     profile_folder.mkdir(parents=True, exist_ok=True)
+    create_missing_folders(user_settings.swap_paths)
     # Move "extra" folders to desktop 
     recovery_folder_created = False
     swap_folder_names = [p.name for p in user_settings.swap_paths]
@@ -125,6 +132,7 @@ def remove_single_files(outgoing_profile: str, incoming_profile: str):
 
 def load_profile_to_live(profile_name: str, user_settings: UserSettings):
     logger.info("Loading profile to live mods: %s", profile_name)
+    create_missing_folders(user_settings.swap_paths)
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
     if not profile_folder.exists():
         raise FileNotFoundError(f"No profile folder found for '{profile_name}'")
