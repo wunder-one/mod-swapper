@@ -68,6 +68,12 @@ def get_unique_path(base_path: Path) -> Path:
             return new_path
         counter += 1
 
+def create_missing_folders(swap_paths: list[Path]):
+    for path in swap_paths:
+        if not path.exists() and path.is_dir():
+            path.mkdir(parents=True, exist_ok=True)
+            logger.debug("Created missing folder: %s", path)
+
 def save_live_to_profile(profile_name: str, user_settings: UserSettings):
     # Create profile folder if needed
     profile_folder = PROFILES_SNAPSHOT_DIR / profile_name
@@ -103,6 +109,9 @@ def save_live_to_profile(profile_name: str, user_settings: UserSettings):
                 copy_file(live_path, storage_file_path, excluded_files)
                 # Need to consider if file source should be parent folder or file path.
                 manifest_data["targets"].append({ "source": str(live_path), "storage": str(storage_file_path), "type": "file" })
+        else:
+            manifest_data["targets"].append({ "source": str(live_path), "storage": "", "type": "none" })
+            logger.warning("Live path does not exist, recording as empty target: %s", live_path)
         
     json_data = json.dumps(manifest_data, indent=4, default=str)
     manifest_file = profile_folder / "manifest.json"
@@ -148,6 +157,22 @@ def load_profile_to_live(profile_name: str, user_settings: UserSettings):
             )
         if target["type"] == "file":
             copy_file(storage_path, dst_path, excluded_files)
+        if target["type"] == "none":
+            logger.debug("Target is recorded as empty, checking if path exists: %s", target["source"])
+            if dst_path.exists() and dst_path.is_dir():
+                logger.debug("Deleting empty target directory recursively: %s", dst_path)
+                for root, dirs, files in dst_path.walk(top_down=False):
+                    for name in files:
+                        (root / name).unlink()
+                    for name in dirs:
+                        (root / name).rmdir()
+                dst_path.rmdir()
+            elif dst_path.exists() and dst_path.is_file():
+                logger.debug("Removing empty target file: %s", dst_path)
+                dst_path.unlink()
+            else:
+                logger.debug("Path does not exist, skipping: %s", dst_path)
+
 
 def create_new_profile(
     profile_name: str,
