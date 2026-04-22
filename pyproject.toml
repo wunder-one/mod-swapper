@@ -8,3 +8,7 @@ dependencies = [
     "customtkinter==5.2.2",
     "pyinstaller==6.19.0",
 ]
+
+[tool.ruff.lint]
+# Scratch scripts insert the repo root on sys.path before importing local packages.
+per-file-ignores = { "scratch/*.py" = ["E402"] }

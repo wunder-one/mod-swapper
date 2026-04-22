@@ -13,7 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class DeleteDialog(customtkinter.CTkToplevel):
-    def __init__(self, master, prof_state: ProfileState, user_settings: UserSettings, *args, **kwargs):
+    def __init__(
+        self,
+        master,
+        prof_state: ProfileState,
+        user_settings: UserSettings,
+        *args,
+        **kwargs,
+    ):
         super().__init__(master, *args, **kwargs)
         self.prof_state = prof_state
         self.user_settings = user_settings
@@ -30,10 +37,14 @@ class DeleteDialog(customtkinter.CTkToplevel):
 
         self.bind("<Map>", self._on_map)
 
-        self.info_label = WrappingLabel(self, text="Choose a profile to delete.", fg_color="transparent")
+        self.info_label = WrappingLabel(
+            self, text="Choose a profile to delete.", fg_color="transparent"
+        )
         self.info_label.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="new")
 
-        self.profile_button_fr = customtkinter.CTkFrame(self, fg_color="transparent", border_width=2)
+        self.profile_button_fr = customtkinter.CTkFrame(
+            self, fg_color="transparent", border_width=2
+        )
         self.profile_button_fr.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
         self.profile_button_fr.grid_columnconfigure(0, weight=1)
 
@@ -44,16 +55,29 @@ class DeleteDialog(customtkinter.CTkToplevel):
                 command=lambda p=profile: self._on_profile_button_click(p),
             )
             if index == 0:
-                profile_button.grid(row=2 + index, column=0, padx=10, pady=10, sticky="ew")
+                profile_button.grid(
+                    row=2 + index, column=0, padx=10, pady=10, sticky="ew"
+                )
             else:
-                profile_button.grid(row=2 + index, column=0, padx=10, pady=(0, 10), sticky="ew")
+                profile_button.grid(
+                    row=2 + index, column=0, padx=10, pady=(0, 10), sticky="ew"
+                )
 
-        self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
-        self.cancel_button.grid(row=2 + len(self.prof_state.profiles), column=0, padx=20, pady=(40, 20), sticky="ew")
-
+        self.cancel_button = customtkinter.CTkButton(
+            self, text="Cancel", command=self.destroy
+        )
+        self.cancel_button.grid(
+            row=2 + len(self.prof_state.profiles),
+            column=0,
+            padx=20,
+            pady=(40, 20),
+            sticky="ew",
+        )
 
     def _on_profile_button_click(self, profile: str):
-        confirm_dialog = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete {profile}?")
+        confirm_dialog = messagebox.askyesno(
+            "Confirm Delete", f"Are you sure you want to delete {profile}?"
+        )
         if not confirm_dialog:
             return
         logger.info("Deleting profile: %s", profile)

@@ -20,7 +20,14 @@ logger = logging.getLogger(__name__)
 
 
 class OverwriteDialog(customtkinter.CTkToplevel):
-    def __init__(self, master, prof_state: ProfileState, user_settings: UserSettings, *args, **kwargs):
+    def __init__(
+        self,
+        master,
+        prof_state: ProfileState,
+        user_settings: UserSettings,
+        *args,
+        **kwargs,
+    ):
         super().__init__(master, *args, **kwargs)
         self._app: App = master
         self.prof_state = prof_state
@@ -40,13 +47,20 @@ class OverwriteDialog(customtkinter.CTkToplevel):
 
         self.bind("<Map>", self._on_map)
 
-        self.info_label = WrappingLabel(self, text="Select a profile to overwrite.", fg_color="transparent")
+        self.info_label = WrappingLabel(
+            self, text="Select a profile to overwrite.", fg_color="transparent"
+        )
         self.info_label.grid(row=0, column=0, padx=20, pady=(10, 0), sticky="new")
 
-        self.warning_label = WrappingLabel(self, text="Warning: Overwriting will erase all data in the profile you select.")
+        self.warning_label = WrappingLabel(
+            self,
+            text="Warning: Overwriting will erase all data in the profile you select.",
+        )
         self.warning_label.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="new")
 
-        self.profile_button_fr = customtkinter.CTkFrame(self, fg_color="transparent", border_width=2)
+        self.profile_button_fr = customtkinter.CTkFrame(
+            self, fg_color="transparent", border_width=2
+        )
         self.profile_button_fr.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
         self.profile_button_fr.grid_columnconfigure(0, weight=1)
 
@@ -57,16 +71,29 @@ class OverwriteDialog(customtkinter.CTkToplevel):
                 command=lambda p=profile: self._on_profile_button_click(p),
             )
             if index == 0:
-                profile_button.grid(row=2 + index, column=0, padx=10, pady=10, sticky="ew")
+                profile_button.grid(
+                    row=2 + index, column=0, padx=10, pady=10, sticky="ew"
+                )
             else:
-                profile_button.grid(row=2 + index, column=0, padx=10, pady=(0, 10), sticky="ew")
+                profile_button.grid(
+                    row=2 + index, column=0, padx=10, pady=(0, 10), sticky="ew"
+                )
 
-        self.cancel_button = customtkinter.CTkButton(self, text="Cancel", command=self.destroy)
-        self.cancel_button.grid(row=2 + len(self.prof_state.profiles), column=0, padx=20, pady=(40, 20), sticky="ew")
-
+        self.cancel_button = customtkinter.CTkButton(
+            self, text="Cancel", command=self.destroy
+        )
+        self.cancel_button.grid(
+            row=2 + len(self.prof_state.profiles),
+            column=0,
+            padx=20,
+            pady=(40, 20),
+            sticky="ew",
+        )
 
     def _on_profile_button_click(self, profile: str):
-        confirm_dialog = messagebox.askyesno("Confirm Overwrite", f"Are you sure you want to overwrite {profile}?")
+        confirm_dialog = messagebox.askyesno(
+            "Confirm Overwrite", f"Are you sure you want to overwrite {profile}?"
+        )
         if not confirm_dialog:
             return
         logger.info("Overwriting profile: %s", profile)
@@ -88,6 +115,7 @@ class OverwriteDialog(customtkinter.CTkToplevel):
                 logger.info("Profile %r overwritten.", profile)
 
             self._app.after(0, on_done)
+
         threading.Thread(target=worker, daemon=True).start()
 
     def _reapply_windows_titlebar(self) -> None:

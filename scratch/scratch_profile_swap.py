@@ -30,7 +30,9 @@ def scratch():
     prof_state = ProfileState.load_config()
     user_settings = UserSettings.load_settings()
     swap_profiles(args.profile_to_load, prof_state, user_settings)
-    logger.info("Scratch swap finished; active profile is %r.", prof_state.active_profile)
+    logger.info(
+        "Scratch swap finished; active profile is %r.", prof_state.active_profile
+    )
 
 
 if __name__ == "__main__":
