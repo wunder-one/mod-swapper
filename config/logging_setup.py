@@ -9,6 +9,7 @@ Unix:
 MOD_SWAPPER_LOG=DEBUG uv run python main.py
 """
 
+
 def configure_logging() -> None:
     """Configure root logging once (safe to call from main or test entrypoints)."""
     level_name = os.environ.get("MOD_SWAPPER_LOG", "INFO").upper()

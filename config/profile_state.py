@@ -41,10 +41,10 @@ class ProfileState:
             filtered_data = {k: v for k, v in data.items() if k in allowed_keys}
 
             return cls(**filtered_data)
-            # Need to handle case where active profile in config doesn't exist on disk?        
+            # Need to handle case where active profile in config doesn't exist on disk?
 
         except (json.JSONDecodeError, TypeError) as e:
-            # If the file is garbled or missing required fields, 
+            # If the file is garbled or missing required fields,
             # fall back to a fresh default config.
             logger.warning("Failed to load profile state; using defaults: %s", e)
             return cls()

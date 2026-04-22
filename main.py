@@ -17,6 +17,7 @@ def _meipass_path(relative_path: str) -> str:
         return str(Path(meipass) / relative_path)
     return relative_path
 
+
 def main():
     configure_logging()
     prof_state = ProfileState.load_config()

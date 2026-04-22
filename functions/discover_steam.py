@@ -61,9 +61,10 @@ def find_steam_game_install_path() -> Path | None:
             for line in f:
                 if '"installdir"' in line:
                     install_dir = parse_vdf_value(line)
-                    game_path = target_steam_folder / "steamapps" / "common" / install_dir
+                    game_path = (
+                        target_steam_folder / "steamapps" / "common" / install_dir
+                    )
                     if game_path.exists():
                         return game_path
 
     return None
-

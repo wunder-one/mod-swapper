@@ -5,12 +5,18 @@ from pathlib import Path
 from typing import Literal
 from itertools import chain
 
-from constants import USER_CONFIG_DIR, USER_SETTINGS_FILE, CRITICAL_GAME_FOLDER_PATHS, LOCAL_APPDATA
+from constants import (
+    USER_CONFIG_DIR,
+    USER_SETTINGS_FILE,
+    CRITICAL_GAME_FOLDER_PATHS,
+    LOCAL_APPDATA,
+)
 from functions.discover_steam import find_steam_game_install_path
 
 logger = logging.getLogger(__name__)
 
 InstallType = Literal["steam", "gog", "custom"]
+
 
 def guess_install_type_and_folder() -> tuple[InstallType, Path | None]:
     steam_path = find_steam_game_install_path()
@@ -19,8 +25,9 @@ def guess_install_type_and_folder() -> tuple[InstallType, Path | None]:
     # TODO: logic for GOG install
     return "custom", None
 
+
 @dataclass
-class UserSettings():
+class UserSettings:
     install_type: InstallType
     game_folder: Path | None
     swap_paths: list[Path]
@@ -30,8 +37,16 @@ class UserSettings():
     @staticmethod
     def _get_default_swap_paths(game_folder: Path | None) -> list[Path]:
         app_data_paths = [
-            LOCAL_APPDATA / "Larian Studios" / "Baldur's Gate 3" / "Mods", # C:\Users\wes\AppData\Local\Larian Studios\Baldur's Gate 3\Mods
-            LOCAL_APPDATA / "Larian Studios" / "Baldur's Gate 3" / "PlayerProfiles" / "Public" / "modsettings.lsx",
+            LOCAL_APPDATA
+            / "Larian Studios"
+            / "Baldur's Gate 3"
+            / "Mods",  # C:\Users\wes\AppData\Local\Larian Studios\Baldur's Gate 3\Mods
+            LOCAL_APPDATA
+            / "Larian Studios"
+            / "Baldur's Gate 3"
+            / "PlayerProfiles"
+            / "Public"
+            / "modsettings.lsx",
         ]
         if not game_folder:
             return app_data_paths
@@ -94,11 +109,11 @@ class UserSettings():
         # If no user settings file, load defaults
         if not USER_SETTINGS_FILE.exists():
             return cls.create_with_defaults()
-        # If there is a user settings file, load it 
+        # If there is a user settings file, load it
         try:
             with USER_SETTINGS_FILE.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             # Avoid breaking if config file contains unknown fields
             allowed_keys = {f.name: f.type for f in fields(cls) if f.init}
             del allowed_keys["critical_game_paths"]
@@ -126,21 +141,24 @@ class UserSettings():
                         case "game_folder":
                             converted_data[field_name] = game_folder
                         case "swap_paths":
-                            converted_data[field_name] = cls._get_default_swap_paths(game_folder)
+                            converted_data[field_name] = cls._get_default_swap_paths(
+                                game_folder
+                            )
                         case "user_protected_paths":
-                            converted_data[field_name] = cls._get_default_protected_paths(game_folder)
+                            converted_data[field_name] = (
+                                cls._get_default_protected_paths(game_folder)
+                            )
 
-            return cls(critical_game_paths=cls._getcritical_game_paths(game_folder), **converted_data)
-
-
-
+            return cls(
+                critical_game_paths=cls._getcritical_game_paths(game_folder),
+                **converted_data,
+            )
 
         except (json.JSONDecodeError, TypeError) as e:
-            # If the file is garbled or missing required fields, 
+            # If the file is garbled or missing required fields,
             # fall back to a fresh default config.
             logger.warning("Failed to load user settings; using defaults: %s", e)
             return cls.create_with_defaults()
-        
 
     def save_settings(self):
         USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -158,7 +176,9 @@ class UserSettings():
     def get_all_protected_paths(self) -> tuple[list[Path], list[Path]]:
         excluded_files = []
         excluded_dirs = []
-        for protected_path in chain(self.user_protected_paths, self.critical_game_paths):
+        for protected_path in chain(
+            self.user_protected_paths, self.critical_game_paths
+        ):
             if protected_path.is_file():
                 excluded_files.append(protected_path)
             elif protected_path.is_dir():

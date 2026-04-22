@@ -19,7 +19,9 @@ def scratch():
     parser = argparse.ArgumentParser(
         description="Scratch: save live mods into a profile snapshot.",
     )
-    parser.add_argument("profile_name", type=str, help="Name of the profile folder to write")
+    parser.add_argument(
+        "profile_name", type=str, help="Name of the profile folder to write"
+    )
     args = parser.parse_args()
 
     user_settings = UserSettings.load_settings()
