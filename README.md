@@ -21,8 +21,6 @@ Mod swapper for Baldur's Gate 3. Let's you completely replace all mod related fi
 
 Keep the extracted folder together; the app expects its bundled files next to the executable. If Windows SmartScreen warns about an unknown publisher, you can choose “More info” → “Run anyway” after you trust the download.
 
-(checksum available on release page).
-
 
 ## Screenshots
 
