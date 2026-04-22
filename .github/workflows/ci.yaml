@@ -11,3 +11,4 @@ jobs:
       - run: uv sync --dev
       - run: uvx ruff check .
       - run: uvx ruff format --check .
+
