@@ -1,3 +1,4 @@
+import importlib
 import json
 import sys
 import tempfile
@@ -5,14 +6,16 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from functions import hashed_store_ops
 
-# CI runs on Linux where winreg is unavailable; stub it before module imports.
-sys.modules.setdefault("winreg", Mock())
+def _import_hashed_store_ops():
+    # CI runs on Linux where winreg is unavailable; stub before importing module.
+    sys.modules.setdefault("winreg", Mock())
+    return importlib.import_module("functions.hashed_store_ops")
 
 
 class SaveLiveToProfileTests(unittest.TestCase):
     def test_save_live_to_profile_writes_manifest(self):
+        hashed_store_ops = _import_hashed_store_ops()
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_root = Path(tmpdir)
             profile_name = "test-profile"
