@@ -5,10 +5,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from functions import hashed_store_ops
+
 # CI runs on Linux where winreg is unavailable; stub it before module imports.
 sys.modules.setdefault("winreg", Mock())
-
-from functions import hashed_store_ops
 
 
 class SaveLiveToProfileTests(unittest.TestCase):
