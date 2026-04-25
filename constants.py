@@ -4,6 +4,7 @@ from pathlib import Path
 USER_DIR = Path.home()
 LOCAL_APPDATA = Path(os.getenv("LOCALAPPDATA", USER_DIR / "AppData" / "Local"))
 PROFILES_SNAPSHOT_DIR = LOCAL_APPDATA / "BG3ProfileSwapper" / "profiles"
+FILE_STORE_DIR = LOCAL_APPDATA / "BG3ProfileSwapper" / "file_store"
 ROAMING_APPDATA = Path(os.getenv("APPDATA", USER_DIR / "AppData" / "Roaming"))
 USER_CONFIG_DIR = ROAMING_APPDATA / "BG3ProfileSwapper"
 PROFILE_STATE_FILE = USER_CONFIG_DIR / "profile_state.json"
