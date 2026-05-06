@@ -101,6 +101,17 @@ def save_live_to_profile(
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json_data, encoding="utf-8")
 
+def list_files_to_restore(
+    profile_name: str,
+    file_hash_cache: FileHashCache,
+) -> list[Path]:
+    manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
+    with manifest_file.open("r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    # for source_str,  in manifest["targets"].items():
+    return list[Path]() # TODO: implement
+
+
 
 """
 functions to add
