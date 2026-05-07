@@ -42,30 +42,37 @@ class FileHashCache:
             json.dump(self.cache, f, indent=4, default=str)
 
     @staticmethod
-    def _hash_file(path: Path) -> str:
+    def _hash(path: Path) -> str:
         h = hashlib.sha256()
         with open(path, "rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
                 h.update(chunk)
         return h.hexdigest()
 
-    def get_hash(self, path: Path) -> str:
+    def _hash_and_cache(self, path: Path) -> str:
         stat = path.stat()
         entry = self.cache.get(str(path))
         logger.debug("Getting hash for %s from cache", path)
         if entry and entry["size"] == stat.st_size and entry["mtime"] == stat.st_mtime:
             return entry["hash"]
-        file_hash = self._hash_file(path)
+        file_hash = self._hash(path)
         self.cache[str(path)] = FileMeta(
             size=stat.st_size, mtime=stat.st_mtime, hash=file_hash
         )
         return file_hash
 
+    def get_file_meta(self, path: Path) -> FileMeta | None:
+        entry = self.cache.get(str(path))
+        if entry:
+            return FileMeta(**entry)
+        else:
+            return None
+
     def _blob_path(self, file_hash: str) -> Path:
         return self.store_dir / file_hash[:2] / file_hash[2:]
 
     def store_file(self, source_path: Path) -> Path:
-        file_hash = self.get_hash(source_path)
+        file_hash = self._hash_and_cache(source_path)
         dest = self._blob_path(file_hash)
         dest_rel = dest.relative_to(self.store_dir)
 

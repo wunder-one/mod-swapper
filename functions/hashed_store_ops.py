@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 def _is_excluded(
     file_path: Path,
     excluded_files: set[Path],
-    exclude_dirs: set[Path],
+    excluded_dirs: set[Path],
 ) -> bool:
-    if file_path in excluded_files or file_path.parent in exclude_dirs:
+    if file_path in excluded_files or file_path.parent in excluded_dirs:
         return True
-    for excluded_dir in exclude_dirs:
+    for excluded_dir in excluded_dirs:
         if file_path.is_relative_to(excluded_dir):
             return True
     return False
@@ -26,19 +26,19 @@ def store_directory(
     source_dir: Path,
     file_hash_cache: FileHashCache,
     excluded_files: list[Path] | None = None,
-    exclude_dirs: list[Path] | None = None,
+    excluded_dirs: list[Path] | None = None,
 ) -> dict[str, str]:
     logger.debug("Storing directory: %s", source_dir)
     if excluded_files is None:
         excluded_files = list[Path]()
-    if exclude_dirs is None:
-        exclude_dirs = list[Path]()
+    if excluded_dirs is None:
+        excluded_dirs = list[Path]()
     manifest = {}
     for root, _, files in source_dir.walk():
         for filename in files:
             file_path = root / filename
             # skip protected files and directories
-            if _is_excluded(file_path, set(excluded_files), set(exclude_dirs)):
+            if _is_excluded(file_path, set(excluded_files), set(excluded_dirs)):
                 logger.debug(
                     "File %s is excluded. Skipping.", file_path.relative_to(source_dir)
                 )
@@ -57,13 +57,13 @@ def store_file(
     source_path: Path,
     file_hash_cache: FileHashCache,
     excluded_files: list[Path] | None = None,
-    exclude_dirs: list[Path] | None = None,
+    excluded_dirs: list[Path] | None = None,
 ) -> dict[str, str]:
     if excluded_files is None:
         excluded_files = list[Path]()
-    if exclude_dirs is None:
-        exclude_dirs = list[Path]()
-    if _is_excluded(source_path, set(excluded_files), set(exclude_dirs)):
+    if excluded_dirs is None:
+        excluded_dirs = list[Path]()
+    if _is_excluded(source_path, set(excluded_files), set(excluded_dirs)):
         return {}
     dest_rel = file_hash_cache.store_file(source_path)
     return {str(source_path): str(dest_rel)}
@@ -83,14 +83,14 @@ def save_live_to_profile(
                     live_path,
                     file_hash_cache,
                     excluded_files=excluded_files,
-                    exclude_dirs=excluded_dirs,
+                    excluded_dirs=excluded_dirs,
                 )
             if live_path.is_file():
                 manifest_additions = store_file(
                     live_path,
                     file_hash_cache,
                     excluded_files=excluded_files,
-                    exclude_dirs=excluded_dirs,
+                    excluded_dirs=excluded_dirs,
                 )
             manifest["targets"].update(manifest_additions)
         else:
@@ -101,6 +101,7 @@ def save_live_to_profile(
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json_data, encoding="utf-8")
 
+
 def list_files_to_restore(
     profile_name: str,
     file_hash_cache: FileHashCache,
@@ -108,9 +109,73 @@ def list_files_to_restore(
     manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
     with manifest_file.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
-    # for source_str,  in manifest["targets"].items():
-    return list[Path]() # TODO: implement
+    files_to_restore = list[Path]()
+    for (source_str,) in manifest["targets"].items():
+        source_path = Path(source_str)
+        if not source_path.exists():
+            logger.debug("File %s does not exist. Adding to restore list.", source_path)
+            files_to_restore.append(source_path)
+        else:
+            source_file_meta = file_hash_cache.get_file_meta(source_path)
+            if source_file_meta:
+                stat = source_path.stat()
+                if (
+                    source_file_meta["size"] != stat.st_size
+                    or source_file_meta["mtime"] != stat.st_mtime
+                ):
+                    logger.debug(
+                        "File %s has changed. Adding to restore list.", source_path
+                    )
+                    files_to_restore.append(source_path)
+                else:
+                    logger.debug("File %s is already live. Skipping.", source_path)
+            else:
+                logger.debug(
+                    "File %s is not in cache. Adding to restore list.", source_path
+                )
+                files_to_restore.append(source_path)
+    return files_to_restore
 
+
+def list_files_to_remove(
+    profile_name: str,
+    swap_paths: list[Path],
+    excluded_files: list[Path] | None = None,
+    excluded_dirs: list[Path] | None = None,
+) -> list[Path]:
+    if excluded_files is None:
+        excluded_files = list[Path]()
+    if excluded_dirs is None:
+        excluded_dirs = list[Path]()
+    manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
+    with manifest_file.open("r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    files_to_remove = list[Path]()
+    for swap_path in swap_paths:
+        if (
+            swap_path.exists()
+            and swap_path.is_file()
+            and not _is_excluded(swap_path, set(excluded_files), set(excluded_dirs))
+        ):
+            files_to_remove.append(swap_path)
+        elif (
+            swap_path.exists()
+            and swap_path.is_dir()
+            and not _is_excluded(swap_path, set(excluded_files), set(excluded_dirs))
+        ):
+            for root, _, files in swap_path.walk():
+                for filename in files:
+                    file_path = root / filename
+                    # skip protected files and directories
+                    if _is_excluded(file_path, set(excluded_files), set(excluded_dirs)):
+                        logger.debug(
+                            "File %s is excluded. Skipping.",
+                            file_path.relative_to(swap_path),
+                        )
+                        continue
+                    elif file_path not in manifest["targets"]:
+                        files_to_remove.append(file_path)
+    return files_to_remove
 
 
 """
