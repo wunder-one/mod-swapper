@@ -102,7 +102,7 @@ def save_live_to_profile(
     manifest_file.write_text(json_data, encoding="utf-8")
 
 
-def list_files_to_restore(
+def _list_files_to_restore(
     profile_name: str,
     file_hash_cache: FileHashCache,
 ) -> list[Path]:
@@ -110,8 +110,8 @@ def list_files_to_restore(
     with manifest_file.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
     files_to_restore = list[Path]()
-    for (source_str,) in manifest["targets"].items():
-        source_path = Path(source_str)
+    for source_str in manifest["targets"].keys():
+        source_path = Path(source_str).resolve()
         if not source_path.exists():
             logger.debug("File %s does not exist. Adding to restore list.", source_path)
             files_to_restore.append(source_path)
@@ -137,7 +137,7 @@ def list_files_to_restore(
     return files_to_restore
 
 
-def list_files_to_remove(
+def _list_files_to_remove(
     profile_name: str,
     swap_paths: list[Path],
     excluded_files: list[Path] | None = None,
@@ -150,13 +150,16 @@ def list_files_to_remove(
     manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
     with manifest_file.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
+    target_paths = {Path(path).resolve() for path in manifest["targets"].keys()}
     files_to_remove = list[Path]()
     for swap_path in swap_paths:
         if (
             swap_path.exists()
             and swap_path.is_file()
             and not _is_excluded(swap_path, set(excluded_files), set(excluded_dirs))
+            and swap_path not in target_paths
         ):
+            logger.debug("Adding singlefile %s to remove list", swap_path)
             files_to_remove.append(swap_path)
         elif (
             swap_path.exists()
@@ -167,13 +170,17 @@ def list_files_to_remove(
                 for filename in files:
                     file_path = root / filename
                     # skip protected files and directories
-                    if _is_excluded(file_path, set(excluded_files), set(excluded_dirs)):
+                    if (
+                        _is_excluded(file_path, set(excluded_files), set(excluded_dirs))
+                        and file_path not in target_paths
+                    ):
                         logger.debug(
                             "File %s is excluded. Skipping.",
                             file_path.relative_to(swap_path),
                         )
                         continue
-                    elif file_path not in manifest["targets"]:
+                    elif file_path not in target_paths:
+                        logger.debug("Adding file %s to remove list", file_path)
                         files_to_remove.append(file_path)
     return files_to_remove
 

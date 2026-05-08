@@ -90,6 +90,7 @@ class FileHashCache:
         self.cache[str(source_path)] = FileMeta(
             size=dest_stat.st_size, mtime=dest_stat.st_mtime, hash=file_hash
         )
+        logger.debug("Stored file %s as %s", source_path, dest_rel)
         return dest_rel
 
     def has_blob(self, file_hash: str) -> bool:
