@@ -106,14 +106,14 @@ def _list_files_to_restore(
     profile_name: str,
     file_hash_cache: FileHashCache,
 ) -> list[tuple[Path, Path]]:
-    profile_dir = PROFILES_SNAPSHOT_DIR / profile_name
-    manifest_file = profile_dir / "manifest.json"
+    
+    manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
     with manifest_file.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
     files_to_restore: list[tuple[Path, Path]] = []
-    for live_path_str, storage_path_str in manifest["targets"].items():
+    for live_path_str, storage_rel_str in manifest["targets"].items():
         live_path = Path(live_path_str)
-        storage_path = profile_dir / Path(storage_path_str)
+        storage_path = file_hash_cache.store_dir / storage_rel_str
         if not live_path.exists():
             logger.debug("File %s does not exist. Adding to restore list.", live_path)
             files_to_restore.append((live_path, storage_path))
@@ -196,15 +196,19 @@ def load_profile_to_live(
     )
     # restore files from list of files to restore
     for live_path, storage_path in files_to_restore:
-        tmp_path = live_path.parent / "tmp"
+        if not storage_path.exists():
+            raise FileNotFoundError(
+                f"Snapshot blob missing for {live_path}: {storage_path}"
+            )
+        tmp_path = live_path.parent / f"{live_path.name}.tmp-restore"
         live_path.parent.mkdir(parents=True, exist_ok=True)
         storage_path.copy(tmp_path, follow_symlinks=False, preserve_metadata=True)
-        tmp_path.rename(storage_path)
-        if not storage_path.exists():
+        tmp_path.replace(live_path)
+        if not live_path.exists():
             raise RuntimeError("Failed to restore file %s", live_path)
     # remove files from list of files to remove
     for file in files_to_remove:
-        file.unlink()
+        file.unlink(missing_ok=True)
 
 """
 functions to add
