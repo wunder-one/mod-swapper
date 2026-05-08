@@ -105,35 +105,37 @@ def save_live_to_profile(
 def _list_files_to_restore(
     profile_name: str,
     file_hash_cache: FileHashCache,
-) -> list[Path]:
-    manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
+) -> list[tuple[Path, Path]]:
+    profile_dir = PROFILES_SNAPSHOT_DIR / profile_name
+    manifest_file = profile_dir / "manifest.json"
     with manifest_file.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
-    files_to_restore = list[Path]()
-    for source_str in manifest["targets"].keys():
-        source_path = Path(source_str).resolve()
-        if not source_path.exists():
-            logger.debug("File %s does not exist. Adding to restore list.", source_path)
-            files_to_restore.append(source_path)
+    files_to_restore: list[tuple[Path, Path]] = []
+    for live_path_str, storage_path_str in manifest["targets"].items():
+        live_path = Path(live_path_str)
+        storage_path = profile_dir / Path(storage_path_str)
+        if not live_path.exists():
+            logger.debug("File %s does not exist. Adding to restore list.", live_path)
+            files_to_restore.append((live_path, storage_path))
         else:
-            source_file_meta = file_hash_cache.get_file_meta(source_path)
-            if source_file_meta:
-                stat = source_path.stat()
+            live_file_meta = file_hash_cache.get_file_meta(live_path)
+            if live_file_meta:
+                stat = live_path.stat()
                 if (
-                    source_file_meta["size"] != stat.st_size
-                    or source_file_meta["mtime"] != stat.st_mtime
+                    live_file_meta["size"] != stat.st_size
+                    or live_file_meta["mtime"] != stat.st_mtime
                 ):
                     logger.debug(
-                        "File %s has changed. Adding to restore list.", source_path
+                        "File %s has changed. Adding to restore list.", live_path
                     )
-                    files_to_restore.append(source_path)
+                    files_to_restore.append((live_path, storage_path))
                 else:
-                    logger.debug("File %s is already live. Skipping.", source_path)
+                    logger.debug("File %s is already live. Skipping.", live_path)
             else:
                 logger.debug(
-                    "File %s is not in cache. Adding to restore list.", source_path
+                    "File %s is not in cache. Adding to restore list.", live_path
                 )
-                files_to_restore.append(source_path)
+                files_to_restore.append((live_path, storage_path))
     return files_to_restore
 
 
@@ -171,19 +173,38 @@ def _list_files_to_remove(
                     file_path = root / filename
                     # skip protected files and directories
                     if (
-                        _is_excluded(file_path, set(excluded_files), set(excluded_dirs))
+                        not _is_excluded(file_path, set(excluded_files), set(excluded_dirs))
                         and file_path not in target_paths
                     ):
-                        logger.debug(
-                            "File %s is excluded. Skipping.",
-                            file_path.relative_to(swap_path),
-                        )
-                        continue
-                    elif file_path not in target_paths:
-                        logger.debug("Adding file %s to remove list", file_path)
                         files_to_remove.append(file_path)
     return files_to_remove
 
+
+def load_profile_to_live(
+    profile_name: str,
+    file_hash_cache: FileHashCache,
+    user_settings: UserSettings,
+):
+    # get files to restore and remove
+    files_to_restore = _list_files_to_restore(profile_name, file_hash_cache)
+    excluded_files, excluded_dirs = user_settings.get_all_protected_paths()
+    files_to_remove = _list_files_to_remove(
+        profile_name,
+        user_settings.swap_paths,
+        excluded_files=excluded_files,
+        excluded_dirs=excluded_dirs,
+    )
+    # restore files from list of files to restore
+    for live_path, storage_path in files_to_restore:
+        tmp_path = live_path.parent / "tmp"
+        live_path.parent.mkdir(parents=True, exist_ok=True)
+        storage_path.copy(tmp_path, follow_symlinks=False, preserve_metadata=True)
+        tmp_path.rename(storage_path)
+        if not storage_path.exists():
+            raise RuntimeError("Failed to restore file %s", live_path)
+    # remove files from list of files to remove
+    for file in files_to_remove:
+        file.unlink()
 
 """
 functions to add
