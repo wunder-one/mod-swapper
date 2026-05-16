@@ -40,7 +40,7 @@ def main():
 
     set_default_color_theme(_meipass_path("ui/theme.json"))
     # set_default_color_theme("green")
-    app = ui.app.App(prof_state, user_settings)
+    app = ui.app.App(prof_state, user_settings, blob_store)
     app.iconbitmap(_meipass_path("assets/icons/magic_icon.ico"))
     app.mainloop()
 

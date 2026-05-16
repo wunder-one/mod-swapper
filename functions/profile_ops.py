@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from functions.blob_store import BlobStore
 from config.user_settings import UserSettings
@@ -6,6 +7,7 @@ from config.profile_state import ProfileState
 import json
 
 from constants import PROFILES_SNAPSHOT_DIR
+from functions.file_actions import get_unique_path
 
 logger = logging.getLogger(__name__)
 
@@ -263,20 +265,94 @@ def swap_profile(
     blob_store: BlobStore,
     user_settings: UserSettings,
 ):
-    save_live_to_profile(profile_state.active_profile, blob_store, user_settings)
-    load_profile_to_live(profile_name, blob_store, user_settings)
+    old_profile = profile_state.active_profile
+    backup_profile = None
+    if not old_profile:
+        logger.info("No active profile; creating backup from current live mods.")
+        backup_profile = create_new_profile(
+            "Backup Profile", profile_state, blob_store, user_settings
+        )
+        old_profile = backup_profile
+    else:
+        logger.info(
+            "Saving current profile %r before swap to %r.",
+            old_profile,
+            profile_name,
+        )
+        save_live_to_profile(old_profile, blob_store, user_settings)
+
+    try:
+        load_profile_to_live(profile_name, blob_store, user_settings)
+        profile_state.active_profile = profile_name
+        profile_state.save_config()
+        logger.info("Swap complete; active profile is now %r.", profile_name)
+    except Exception as e:
+        rollback_profile = backup_profile or old_profile
+        logger.error(
+            "Loading profile %r failed; rolling back to %r.",
+            profile_name,
+            rollback_profile,
+        )
+        try:
+            load_profile_to_live(rollback_profile, blob_store, user_settings)
+            profile_state.active_profile = rollback_profile
+            profile_state.save_config()
+            logger.warning("Rolled back; active profile is now %r.", rollback_profile)
+        except Exception as rollback_error:
+            logger.critical("Rollback after failed swap also failed.", exc_info=True)
+            raise RuntimeError(
+                "Critical error: Failed to load new profile and rollback also failed. "
+                "Live mods may be in an inconsistent state."
+            ) from rollback_error
+        raise RuntimeError(
+            f"Failed to load profile '{profile_name}'. Rolled back."
+        ) from e
+
+
+def create_new_profile(
+    profile_name: str,
+    profile_state: ProfileState,
+    blob_store: BlobStore,
+    user_settings: UserSettings,
+    refresh_profiles: Callable[[], None] | None = None,
+) -> str:
+    unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
+    unique_dir.mkdir(parents=True, exist_ok=False)
+    profile_name = unique_dir.name
+    save_live_to_profile(profile_name, blob_store, user_settings)
     profile_state.active_profile = profile_name
     profile_state.save_config()
+    if refresh_profiles is not None:
+        refresh_profiles()
+    return profile_name
 
 
-"""
-functions to add
+def delete_profile(profile_to_delete: str, profile_state: ProfileState):
+    profile_to_delete_dir = PROFILES_SNAPSHOT_DIR / profile_to_delete
+    logger.info("Deleting profile folder recursively: %s", profile_to_delete_dir)
+    for root, dirs, files in profile_to_delete_dir.walk(top_down=False):
+        for name in files:
+            (root / name).unlink()
+        for name in dirs:
+            (root / name).rmdir()
+    profile_to_delete_dir.rmdir()
+    profile_state.remove_profile(profile_to_delete)
 
-restore_directory(...)
-build_manifest(...)
-apply_manifest(...)
 
-
-    manifest = {"version": 2, "targets": {}}
-
-"""
+def overwrite_profile(
+    profile_to_overwrite: str,
+    profile_state: ProfileState,
+    blob_store: BlobStore,
+    user_settings: UserSettings,
+):
+    profile_to_delete_dir = PROFILES_SNAPSHOT_DIR / profile_to_overwrite
+    logger.info("Deleting profile folder recursively: %s", profile_to_delete_dir)
+    for root, dirs, files in profile_to_delete_dir.walk(top_down=False):
+        for name in files:
+            (root / name).unlink()
+        for name in dirs:
+            (root / name).rmdir()
+    profile_to_delete_dir.rmdir()
+    save_live_to_profile(profile_to_overwrite, blob_store, user_settings)
+    profile_state.active_profile = profile_to_overwrite
+    profile_state.save_config()
