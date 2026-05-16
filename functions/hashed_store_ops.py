@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from functions.file_hash_cache import FileHashCache
 from config.user_settings import UserSettings
+from config.profile_state import ProfileState
 import json
 
 from constants import PROFILES_SNAPSHOT_DIR
@@ -85,7 +86,11 @@ def store_file(
         excluded_dirs = list[Path]()
     if _is_excluded(source_path, set(excluded_files), set(excluded_dirs)):
         return {}
-    dest_rel, _copied_to_store = file_hash_cache.store_file(source_path)
+    dest_rel, copied_to_store = file_hash_cache.store_file(source_path)
+    if copied_to_store:
+        logger.info("Copied file %s to store", source_path)
+    else:
+        logger.info("File %s already in store", source_path)
     return {str(source_path): str(dest_rel)}
 
 
@@ -131,11 +136,14 @@ def _list_files_to_restore(
     with manifest_file.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
     files_to_restore: list[tuple[Path, Path]] = []
+    skipped_files_count = 0
+    restored_files_count = 0
     for live_path_str, storage_rel_str in manifest["targets"].items():
         live_path = Path(live_path_str)
         storage_path = file_hash_cache.store_dir / storage_rel_str
         if not live_path.exists():
             logger.debug("File %s does not exist. Adding to restore list.", live_path)
+            restored_files_count += 1
             files_to_restore.append((live_path, storage_path))
         else:
             live_file_meta = file_hash_cache.get_file_meta(live_path)
@@ -148,14 +156,25 @@ def _list_files_to_restore(
                     logger.debug(
                         "File %s has changed. Adding to restore list.", live_path
                     )
+                    restored_files_count += 1
                     files_to_restore.append((live_path, storage_path))
                 else:
                     logger.debug("File %s is already live. Skipping.", live_path)
+                    skipped_files_count += 1
             else:
                 logger.debug(
                     "File %s is not in cache. Adding to restore list.", live_path
                 )
+                restored_files_count += 1
                 files_to_restore.append((live_path, storage_path))
+    logger.info(
+        " - Restoring %s from snapshot:\n"
+        "     %d files to restore\n"
+        "     %d files already in live",
+        profile_name,
+        restored_files_count,
+        skipped_files_count,
+    )
     return files_to_restore
 
 
@@ -199,6 +218,12 @@ def _list_files_to_remove(
                         and file_path not in target_paths
                     ):
                         files_to_remove.append(file_path)
+    logger.info(
+        " - Removing %s from live:\n"
+        "     %d files to remove",
+        profile_name,
+        len(files_to_remove),
+    )
     return files_to_remove
 
 
@@ -231,6 +256,18 @@ def load_profile_to_live(
     # remove files from list of files to remove
     for file in files_to_remove:
         file.unlink(missing_ok=True)
+
+
+def swap_profile(
+    profile_name: str,
+    profile_state: ProfileState,
+    file_hash_cache: FileHashCache,
+    user_settings: UserSettings,
+):
+    save_live_to_profile(profile_state.active_profile, file_hash_cache, user_settings)
+    load_profile_to_live(profile_name, file_hash_cache, user_settings)
+    profile_state.active_profile = profile_name
+    profile_state.save_config()
 
 
 """
