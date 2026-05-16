@@ -34,6 +34,9 @@ def store_directory(
     if excluded_dirs is None:
         excluded_dirs = list[Path]()
     manifest = {}
+    excluded_files_count = 0
+    skipped_files_count = 0
+    copied_files_count = 0
     for root, _, files in source_dir.walk():
         for filename in files:
             file_path = root / filename
@@ -42,14 +45,31 @@ def store_directory(
                 logger.debug(
                     "File %s is excluded. Skipping.", file_path.relative_to(source_dir)
                 )
+                excluded_files_count += 1
                 continue
             # store file in hashed store
-            dest_rel = file_hash_cache.store_file(file_path)
+            dest_rel, copied_to_store = file_hash_cache.store_file(file_path)
             logger.debug(
-                "Stored file %s as %s", file_path.relative_to(source_dir), dest_rel
+                "Stored file %s as %s",
+                file_path.relative_to(source_dir),
+                dest_rel,
             )
+            if copied_to_store:
+                copied_files_count += 1
+            else:
+                skipped_files_count += 1
             # add file to manifest
             manifest[str(file_path)] = str(dest_rel)
+    logger.info(
+        " - Stored directory %s:\n"
+        "     %d copied files\n"
+        "     %d already stored files (skipped)\n"
+        "     %d protected files (skipped)",
+        source_dir,
+        copied_files_count,
+        skipped_files_count,
+        excluded_files_count,
+    )
     return manifest
 
 
@@ -65,7 +85,7 @@ def store_file(
         excluded_dirs = list[Path]()
     if _is_excluded(source_path, set(excluded_files), set(excluded_dirs)):
         return {}
-    dest_rel = file_hash_cache.store_file(source_path)
+    dest_rel, _copied_to_store = file_hash_cache.store_file(source_path)
     return {str(source_path): str(dest_rel)}
 
 
@@ -106,7 +126,7 @@ def _list_files_to_restore(
     profile_name: str,
     file_hash_cache: FileHashCache,
 ) -> list[tuple[Path, Path]]:
-    
+
     manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
     with manifest_file.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
@@ -173,7 +193,9 @@ def _list_files_to_remove(
                     file_path = root / filename
                     # skip protected files and directories
                     if (
-                        not _is_excluded(file_path, set(excluded_files), set(excluded_dirs))
+                        not _is_excluded(
+                            file_path, set(excluded_files), set(excluded_dirs)
+                        )
                         and file_path not in target_paths
                     ):
                         files_to_remove.append(file_path)
@@ -209,6 +231,7 @@ def load_profile_to_live(
     # remove files from list of files to remove
     for file in files_to_remove:
         file.unlink(missing_ok=True)
+
 
 """
 functions to add
