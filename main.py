@@ -6,6 +6,9 @@ import ui.app
 from config.logging_setup import configure_logging
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
+from functions.blob_store import BlobStore
+from functions.migrate import migrate_file_store
+from config.migration_state import MigrationState
 from customtkinter import set_default_color_theme
 
 logger = logging.getLogger(__name__)
@@ -20,11 +23,20 @@ def _meipass_path(relative_path: str) -> str:
 
 def main():
     configure_logging()
+
     prof_state = ProfileState.load_config()
-    user_settings = UserSettings.load_settings()
     logger.info("Active profile from config: %s", prof_state.active_profile)
     logger.info("Available profiles: %s", list(prof_state.profiles.keys()))
+
+    user_settings = UserSettings.load_settings()
     logger.info("Game folder: %s", user_settings.game_folder)
+
+    blob_store = BlobStore.load_cache()
+
+    migration_state = MigrationState.load_state()
+    if not migration_state.migration_state:
+        migrate_file_store(blob_store)
+        migration_state.update_state(True)
 
     set_default_color_theme(_meipass_path("ui/theme.json"))
     # set_default_color_theme("green")

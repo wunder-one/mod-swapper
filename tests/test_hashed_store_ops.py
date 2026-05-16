@@ -47,7 +47,7 @@ class SaveLiveToProfileTests(unittest.TestCase):
             )
 
             # Hash cache is passed through to underlying storage helpers.
-            file_hash_cache = Mock()
+            blob_store = Mock()
             # Pretend results returned by directory/file storage helpers.
             dir_manifest = {str(live_dir / "nested.txt"): "hash-store/dir-entry"}
             file_manifest = {str(live_file): "hash-store/file-entry"}
@@ -68,21 +68,21 @@ class SaveLiveToProfileTests(unittest.TestCase):
                 # Execute function under test: snapshot live paths into manifest.
                 hashed_store_ops.save_live_to_profile(
                     profile_name=profile_name,
-                    file_hash_cache=file_hash_cache,
+                    blob_store=blob_store,
                     user_settings=user_settings,
                 )
 
             # Directory inputs should call store_directory with exclusions.
             store_directory_mock.assert_called_once_with(
                 live_dir,
-                file_hash_cache,
+                blob_store,
                 excluded_files=excluded_files,
                 excluded_dirs=excluded_dirs,
             )
             # File inputs should call store_file with the same exclusions.
             store_file_mock.assert_called_once_with(
                 live_file,
-                file_hash_cache,
+                blob_store,
                 excluded_files=excluded_files,
                 excluded_dirs=excluded_dirs,
             )

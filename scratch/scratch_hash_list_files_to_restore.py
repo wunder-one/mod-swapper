@@ -9,7 +9,7 @@ import argparse
 import logging
 
 from config.logging_setup import configure_logging
-from functions.file_hash_cache import FileHashCache
+from functions.blob_store import BlobStore
 from functions.hashed_store_ops import _list_files_to_restore
 
 logger = logging.getLogger(__name__)
@@ -26,8 +26,8 @@ def scratch():
     )
     args = parser.parse_args()
 
-    file_hash_cache = FileHashCache.load_cache()
-    files_to_restore = _list_files_to_restore(args.profile_name, file_hash_cache)
+    blob_store = BlobStore.load_cache()
+    files_to_restore = _list_files_to_restore(args.profile_name, blob_store)
     logger.info("Files to restore:")
     for file in files_to_restore:
         logger.info("  - %s", file)

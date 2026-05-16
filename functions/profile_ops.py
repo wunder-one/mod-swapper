@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from functions.file_hash_cache import FileHashCache
+from functions.blob_store import BlobStore
 from config.user_settings import UserSettings
 from config.profile_state import ProfileState
 import json
@@ -25,7 +25,7 @@ def _is_excluded(
 
 def store_directory(
     source_dir: Path,
-    file_hash_cache: FileHashCache,
+    blob_store: BlobStore,
     excluded_files: list[Path] | None = None,
     excluded_dirs: list[Path] | None = None,
 ) -> dict[str, str]:
@@ -34,7 +34,7 @@ def store_directory(
         excluded_files = list[Path]()
     if excluded_dirs is None:
         excluded_dirs = list[Path]()
-    manifest = {}
+    manifest_additions = {}
     excluded_files_count = 0
     skipped_files_count = 0
     copied_files_count = 0
@@ -49,7 +49,7 @@ def store_directory(
                 excluded_files_count += 1
                 continue
             # store file in hashed store
-            dest_rel, copied_to_store = file_hash_cache.store_file(file_path)
+            dest_rel, copied_to_store = blob_store.store_file(file_path)
             logger.debug(
                 "Stored file %s as %s",
                 file_path.relative_to(source_dir),
@@ -60,7 +60,7 @@ def store_directory(
             else:
                 skipped_files_count += 1
             # add file to manifest
-            manifest[str(file_path)] = str(dest_rel)
+            manifest_additions[str(file_path)] = str(dest_rel)
     logger.info(
         " - Stored directory %s:\n"
         "     %d copied files\n"
@@ -71,12 +71,12 @@ def store_directory(
         skipped_files_count,
         excluded_files_count,
     )
-    return manifest
+    return manifest_additions
 
 
 def store_file(
     source_path: Path,
-    file_hash_cache: FileHashCache,
+    blob_store: BlobStore,
     excluded_files: list[Path] | None = None,
     excluded_dirs: list[Path] | None = None,
 ) -> dict[str, str]:
@@ -86,7 +86,7 @@ def store_file(
         excluded_dirs = list[Path]()
     if _is_excluded(source_path, set(excluded_files), set(excluded_dirs)):
         return {}
-    dest_rel, copied_to_store = file_hash_cache.store_file(source_path)
+    dest_rel, copied_to_store = blob_store.store_file(source_path)
     if copied_to_store:
         logger.info("Copied file %s to store", source_path)
     else:
@@ -96,7 +96,7 @@ def store_file(
 
 def save_live_to_profile(
     profile_name: str,
-    file_hash_cache: FileHashCache,
+    blob_store: BlobStore,
     user_settings: UserSettings,
 ):
     excluded_files, excluded_dirs = user_settings.get_all_protected_paths()
@@ -106,14 +106,14 @@ def save_live_to_profile(
             if live_path.is_dir():
                 manifest_additions = store_directory(
                     live_path,
-                    file_hash_cache,
+                    blob_store,
                     excluded_files=excluded_files,
                     excluded_dirs=excluded_dirs,
                 )
             if live_path.is_file():
                 manifest_additions = store_file(
                     live_path,
-                    file_hash_cache,
+                    blob_store,
                     excluded_files=excluded_files,
                     excluded_dirs=excluded_dirs,
                 )
@@ -129,7 +129,7 @@ def save_live_to_profile(
 
 def _list_files_to_restore(
     profile_name: str,
-    file_hash_cache: FileHashCache,
+    blob_store: BlobStore,
 ) -> list[tuple[Path, Path]]:
 
     manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
@@ -140,13 +140,13 @@ def _list_files_to_restore(
     restored_files_count = 0
     for live_path_str, storage_rel_str in manifest["targets"].items():
         live_path = Path(live_path_str)
-        storage_path = file_hash_cache.store_dir / storage_rel_str
+        storage_path = blob_store.store_dir / storage_rel_str
         if not live_path.exists():
             logger.debug("File %s does not exist. Adding to restore list.", live_path)
             restored_files_count += 1
             files_to_restore.append((live_path, storage_path))
         else:
-            live_file_meta = file_hash_cache.get_file_meta(live_path)
+            live_file_meta = blob_store.get_file_meta(live_path)
             if live_file_meta:
                 stat = live_path.stat()
                 if (
@@ -219,8 +219,7 @@ def _list_files_to_remove(
                     ):
                         files_to_remove.append(file_path)
     logger.info(
-        " - Removing %s from live:\n"
-        "     %d files to remove",
+        " - Removing %s from live:\n     %d files to remove",
         profile_name,
         len(files_to_remove),
     )
@@ -229,11 +228,11 @@ def _list_files_to_remove(
 
 def load_profile_to_live(
     profile_name: str,
-    file_hash_cache: FileHashCache,
+    blob_store: BlobStore,
     user_settings: UserSettings,
 ):
     # get files to restore and remove
-    files_to_restore = _list_files_to_restore(profile_name, file_hash_cache)
+    files_to_restore = _list_files_to_restore(profile_name, blob_store)
     excluded_files, excluded_dirs = user_settings.get_all_protected_paths()
     files_to_remove = _list_files_to_remove(
         profile_name,
@@ -261,11 +260,11 @@ def load_profile_to_live(
 def swap_profile(
     profile_name: str,
     profile_state: ProfileState,
-    file_hash_cache: FileHashCache,
+    blob_store: BlobStore,
     user_settings: UserSettings,
 ):
-    save_live_to_profile(profile_state.active_profile, file_hash_cache, user_settings)
-    load_profile_to_live(profile_name, file_hash_cache, user_settings)
+    save_live_to_profile(profile_state.active_profile, blob_store, user_settings)
+    load_profile_to_live(profile_name, blob_store, user_settings)
     profile_state.active_profile = profile_name
     profile_state.save_config()
 

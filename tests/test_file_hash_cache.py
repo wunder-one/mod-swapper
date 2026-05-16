@@ -4,10 +4,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from functions.file_hash_cache import FileHashCache
+from functions.blob_store import BlobStore
 
 
-class FileHashCacheMtimeTests(unittest.TestCase):
+class BlobStoreMtimeTests(unittest.TestCase):
     def test_get_hash_uses_cache_when_file_is_unchanged(self):
         # Create an isolated temporary filesystem for the test.
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -17,11 +17,11 @@ class FileHashCacheMtimeTests(unittest.TestCase):
             source_file.write_text("v1", encoding="utf-8")
 
             # Load a cache instance backed by a temporary store directory.
-            cache = FileHashCache.load_cache(store_dir=root / "store")
+            cache = BlobStore.load_cache(store_dir=root / "store")
 
             # Wrap _hash_file so we can count real hash computations.
             with patch.object(
-                FileHashCache, "_hash_file", wraps=FileHashCache._hash_file
+                BlobStore, "_hash_file", wraps=BlobStore._hash_file
             ) as hash_mock:
                 # First call computes and caches the hash.
                 first_hash = cache.get_hash(source_file)
@@ -42,7 +42,7 @@ class FileHashCacheMtimeTests(unittest.TestCase):
             source_file.write_text("v1", encoding="utf-8")
 
             # Prime the cache with the file's initial hash and mtime.
-            cache = FileHashCache.load_cache(store_dir=root / "store")
+            cache = BlobStore.load_cache(store_dir=root / "store")
             first_hash = cache.get_hash(source_file)
 
             # Ensure the next write gets a distinct mtime on Windows filesystems.
@@ -52,7 +52,7 @@ class FileHashCacheMtimeTests(unittest.TestCase):
 
             # Wrap _hash_file so we can confirm recomputation occurs.
             with patch.object(
-                FileHashCache, "_hash_file", wraps=FileHashCache._hash_file
+                BlobStore, "_hash_file", wraps=BlobStore._hash_file
             ) as hash_mock:
                 # Cache should detect mtime change and re-hash the file.
                 second_hash = cache.get_hash(source_file)

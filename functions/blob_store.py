@@ -17,7 +17,7 @@ class FileMeta(TypedDict):
 
 
 @dataclass
-class FileHashCache:
+class BlobStore:
     cache: dict[str, FileMeta]
     store_dir: Path = FILE_STORE_DIR
 
@@ -26,7 +26,7 @@ class FileHashCache:
         return self.store_dir / "file_store_cache.json"
 
     @classmethod
-    def load_cache(cls, store_dir: Path = FILE_STORE_DIR) -> "FileHashCache":
+    def load_cache(cls, store_dir: Path = FILE_STORE_DIR) -> "BlobStore":
         cache = cls(cache={}, store_dir=store_dir)
         cache.store_dir.mkdir(parents=True, exist_ok=True)
         if not cache.cache_file.exists():

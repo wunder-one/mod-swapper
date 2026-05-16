@@ -10,7 +10,7 @@ import logging
 
 from config.logging_setup import configure_logging
 from config.user_settings import UserSettings
-from functions.file_hash_cache import FileHashCache
+from functions.blob_store import BlobStore
 from functions.hashed_store_ops import load_profile_to_live
 
 logger = logging.getLogger(__name__)
@@ -28,10 +28,10 @@ def scratch():
     args = parser.parse_args()
 
     user_settings = UserSettings.load_settings()
-    file_hash_cache = FileHashCache.load_cache()
+    blob_store = BlobStore.load_cache()
     load_profile_to_live(
         args.profile_name,
-        file_hash_cache,
+        blob_store,
         user_settings,
     )
 
