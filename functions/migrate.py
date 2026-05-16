@@ -120,3 +120,22 @@ def migrate_directory(
         skipped_files_count,
     )
     return manifest_additions
+
+def _cleanup_v1_profile_data(profile_path: Path) -> None:
+    # Verify manifest is valid V2 before cleanup
+    try:
+        profile_manifest_file = profile_path / "manifest.json"
+        with profile_manifest_file.open("r", encoding="utf-8") as f:
+            written = json.load(f)
+        if written.get("version") != 2:
+            logger.error("Manifest verification failed for %s; skipping cleanup", profile_path.name)
+            return
+        # delete all files and directories in profile except manifest
+        for child in profile_path.iterdir():  
+            if child == profile_manifest_file:
+                continue
+            child.unlink()
+    except Exception:
+        logger.error("Failed to cleanup V1 profile data for %s", profile_path.name)
+        raise
+    logger.info("Cleaned up V1 profile data for %s", profile_path.name)
