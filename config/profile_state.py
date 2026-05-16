@@ -50,4 +50,4 @@ class ProfileState:
             return cls()
 
     def remove_profile(self, profile: str):
-        del self.profiles[profile]
+        self.profiles.pop(profile, None)

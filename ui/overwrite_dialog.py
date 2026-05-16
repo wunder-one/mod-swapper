@@ -117,6 +117,7 @@ class OverwriteDialog(customtkinter.CTkToplevel):
 
             def on_done():
                 self._app.hide_progress_bar()
+                self._app.refresh_profiles()
                 logger.info("Profile %r overwritten.", profile)
 
             self._app.after(0, on_done)

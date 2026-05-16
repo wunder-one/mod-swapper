@@ -105,6 +105,7 @@ def save_live_to_profile(
     manifest = {"version": 2, "targets": {}}
     for live_path in user_settings.swap_paths:
         if live_path.exists():
+            manifest_additions = {}
             if live_path.is_dir():
                 manifest_additions = store_directory(
                     live_path,
@@ -200,7 +201,7 @@ def _list_files_to_remove(
             swap_path.exists()
             and swap_path.is_file()
             and not _is_excluded(swap_path, set(excluded_files), set(excluded_dirs))
-            and swap_path not in target_paths
+            and swap_path.resolve() not in target_paths
         ):
             logger.debug("Adding singlefile %s to remove list", swap_path)
             files_to_remove.append(swap_path)
@@ -217,7 +218,7 @@ def _list_files_to_remove(
                         not _is_excluded(
                             file_path, set(excluded_files), set(excluded_dirs)
                         )
-                        and file_path not in target_paths
+                        and file_path.resolve() not in target_paths
                     ):
                         files_to_remove.append(file_path)
     logger.info(
@@ -340,20 +341,35 @@ def delete_profile(profile_to_delete: str, profile_state: ProfileState):
     profile_state.remove_profile(profile_to_delete)
 
 
+def _rmtree(path: Path):
+    for root, dirs, files in path.walk(top_down=False):
+        for name in files:
+            (root / name).unlink()
+        for name in dirs:
+            (root / name).rmdir()
+    path.rmdir()
+
+
 def overwrite_profile(
     profile_to_overwrite: str,
     profile_state: ProfileState,
     blob_store: BlobStore,
     user_settings: UserSettings,
 ):
-    profile_to_delete_dir = PROFILES_SNAPSHOT_DIR / profile_to_overwrite
-    logger.info("Deleting profile folder recursively: %s", profile_to_delete_dir)
-    for root, dirs, files in profile_to_delete_dir.walk(top_down=False):
-        for name in files:
-            (root / name).unlink()
-        for name in dirs:
-            (root / name).rmdir()
-    profile_to_delete_dir.rmdir()
-    save_live_to_profile(profile_to_overwrite, blob_store, user_settings)
+    profile_dir = PROFILES_SNAPSHOT_DIR / profile_to_overwrite
+    if not profile_dir.exists():
+        raise FileNotFoundError(f"Profile {profile_to_overwrite} does not exist.")
+    logger.info("Overwriting profile: %s", profile_dir)
+    backup_dir = PROFILES_SNAPSHOT_DIR / f"{profile_to_overwrite}.tmp-rollback"
+    profile_dir.rename(backup_dir)
+    try:
+        save_live_to_profile(profile_to_overwrite, blob_store, user_settings)
+    except Exception:
+        if (PROFILES_SNAPSHOT_DIR / profile_to_overwrite).exists():
+            _rmtree(PROFILES_SNAPSHOT_DIR / profile_to_overwrite)
+        backup_dir.rename(profile_dir)
+        raise
+    _rmtree(backup_dir)
+    blob_store.save_cache()
     profile_state.active_profile = profile_to_overwrite
     profile_state.save_config()

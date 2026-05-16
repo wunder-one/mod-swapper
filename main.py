@@ -35,8 +35,11 @@ def main():
 
     migration_state = MigrationState.load_state()
     if not migration_state.migration_state:
-        migrate_file_store(blob_store)
-        migration_state.update_state(True)
+        try:
+            migrate_file_store(blob_store)
+            migration_state.update_state(True)
+        except Exception as e:
+            logger.error("Migration failed: %s", e)
 
     set_default_color_theme(_meipass_path("ui/theme.json"))
     # set_default_color_theme("green")

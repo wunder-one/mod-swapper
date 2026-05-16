@@ -96,7 +96,7 @@ class BlobStore:
             logger.debug("File %s already in cache. Skipping copy.", source_path)
             return dest_rel, False
 
-        tmp_path = self.store_dir / "tmp"
+        tmp_path = self.store_dir / f"tmp.{file_hash[:16]}"
         dest.parent.mkdir(parents=True, exist_ok=True)
         source_path.copy(tmp_path)
         tmp_path.rename(dest)

@@ -22,12 +22,17 @@ def migrate_file_store(blob_store: BlobStore):
         logger.info("No profiles to migrate.")
         return
     logger.info("Migrating file store...")
+    failed = []
     for child in profiles:
         try:
             migrate_profile(child, blob_store)
         except Exception as e:
             logger.error("Failed to migrate %s profile: %s", child.name, e)
-            raise
+            failed.append(child.name)
+    if failed:
+        raise RuntimeError(
+            "Failed to migrate %d profile(s): %s" % (len(failed), ", ".join(failed))
+        )
 
 
 def migrate_profile(profile_path: Path, blob_store: BlobStore):
@@ -35,8 +40,7 @@ def migrate_profile(profile_path: Path, blob_store: BlobStore):
     try:
         profile_manifest_file = profile_path / "manifest.json"
         if not profile_manifest_file.exists():
-            logger.error("Profile %s has no manifest file.", profile_path.name)
-            return
+            raise ValueError("Profile %s has no manifest file." % profile_path.name)
         with profile_manifest_file.open("r", encoding="utf-8") as f:
             v1_manifest = json.load(f)
         if v1_manifest["version"] > 1:
@@ -44,29 +48,36 @@ def migrate_profile(profile_path: Path, blob_store: BlobStore):
             return
         v2_manifest = {"version": 2, "targets": {}}
         for target in v1_manifest["targets"]:
-            source_path = Path(target["source"])
-            v1_storage_path = Path(target["storage"])
-            target_type = target["type"]
-            if target_type == "file":
-                logger.info("Migrating file %s...", source_path.name)
-                manifest_additions = migrate_file(
-                    source_path, v1_storage_path, blob_store
-                )
-            elif target_type == "directory":
-                logger.info("Migrating directory %s...", source_path.name)
-                manifest_additions = migrate_directory(
-                    source_path, v1_storage_path, blob_store
-                )
-            else:
+            try:
+                source_path = Path(target["source"])
+                v1_storage_path = Path(target["storage"])
+                target_type = target["type"]
+                if target_type == "file":
+                    logger.info("Migrating file %s...", source_path.name)
+                    manifest_additions = migrate_file(
+                        source_path, v1_storage_path, blob_store
+                    )
+                elif target_type == "directory":
+                    logger.info("Migrating directory %s...", source_path.name)
+                    manifest_additions = migrate_directory(
+                        source_path, v1_storage_path, blob_store
+                    )
+                else:
+                    logger.warning(
+                        "Unknown type %s for file %s.", target_type, source_path.name
+                    )
+                    manifest_additions = {}
+                v2_manifest["targets"].update(manifest_additions)
+            except Exception as e:
                 logger.warning(
-                    "Unknown type %s for file %s.", target_type, source_path.name
+                    "Skipping target %s: %s", target.get("source", "unknown"), e
                 )
-            v2_manifest["targets"].update(manifest_additions)
         with profile_manifest_file.open("w", encoding="utf-8") as f:
             json.dump(v2_manifest, f, indent=4, default=str)
     except Exception as e:
         logger.error("Failed to migrate profile %s: %s", profile_path.name, e)
         raise
+    _cleanup_v1_profile_data(profile_path)
 
 
 def migrate_file(
@@ -141,6 +152,9 @@ def _cleanup_v1_profile_data(profile_path: Path) -> None:
         # delete all files and directories in profile except manifest
         for child in profile_path.iterdir():
             if child == profile_manifest_file:
+                continue
+            if not child.is_dir():
+                child.unlink()
                 continue
             for root, dirs, files in child.walk(top_down=False):
                 for name in files:

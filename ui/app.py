@@ -16,7 +16,7 @@ from functions.profile_ops import (
     create_new_profile,
     delete_profile,
 )
-from ui.ui_fuctions import load_window_geometry, save_window_geometry
+from ui.ui_functions import load_window_geometry, save_window_geometry
 
 logger = logging.getLogger(__name__)
 
