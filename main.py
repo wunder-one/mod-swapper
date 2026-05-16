@@ -47,6 +47,7 @@ def main():
     logger.info("Saving configuration...")
     prof_state.save_config()
     user_settings.save_settings()
+    blob_store.save_cache()
     logger.info("Shutdown complete.")
 
 

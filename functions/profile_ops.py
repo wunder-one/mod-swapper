@@ -280,6 +280,7 @@ def swap_profile(
             profile_name,
         )
         save_live_to_profile(old_profile, blob_store, user_settings)
+    blob_store.save_cache()
 
     try:
         load_profile_to_live(profile_name, blob_store, user_settings)

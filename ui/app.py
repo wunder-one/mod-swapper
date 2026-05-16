@@ -205,7 +205,9 @@ class App(customtkinter.CTk):
 
         def worker():
             try:
-                swap_profile(profile, self.prof_state, self.blob_store, self.user_settings)
+                swap_profile(
+                    profile, self.prof_state, self.blob_store, self.user_settings
+                )
             except ValueError as e:
                 logger.info("Profile swap skipped: %s", e)
             except Exception:

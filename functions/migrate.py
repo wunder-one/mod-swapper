@@ -9,22 +9,25 @@ logger = logging.getLogger(__name__)
 
 
 def migrate_file_store(blob_store: BlobStore):
+    if not PROFILES_SNAPSHOT_DIR.is_dir():
+        logger.info("No profiles directory; nothing to migrate.")
+        return
+    profiles = []
     try:
-        if PROFILES_SNAPSHOT_DIR.is_dir() and any(
-            child.is_dir() for child in PROFILES_SNAPSHOT_DIR.iterdir()
-        ):
-            pass
-    except Exception:
+        profiles = [p for p in PROFILES_SNAPSHOT_DIR.iterdir() if p.is_dir()]
+    except OSError as e:
+        logger.warning("Could not list profiles directory: %s", e)
+        return
+    if not profiles:
         logger.info("No profiles to migrate.")
         return
     logger.info("Migrating file store...")
-    for child in PROFILES_SNAPSHOT_DIR.iterdir():
-        if child.is_dir():
-            try:
-                migrate_profile(child, blob_store)
-            except Exception as e:
-                logger.error("Failed to migrate %s profile: %s", child.name, e)
-                raise
+    for child in profiles:
+        try:
+            migrate_profile(child, blob_store)
+        except Exception as e:
+            logger.error("Failed to migrate %s profile: %s", child.name, e)
+            raise
 
 
 def migrate_profile(profile_path: Path, blob_store: BlobStore):
@@ -40,23 +43,24 @@ def migrate_profile(profile_path: Path, blob_store: BlobStore):
             logger.info("Profile %s is already migrated.", profile_path.name)
             return
         v2_manifest = {"version": 2, "targets": {}}
-        for source_path_str, v1_storage_path_str, type in v1_manifest[
-            "targets"
-        ].items():
-            source_path = Path(source_path_str)
-            v1_storage_path = Path(v1_storage_path_str)
-            if type == "file":
+        for target in v1_manifest["targets"]:
+            source_path = Path(target["source"])
+            v1_storage_path = Path(target["storage"])
+            target_type = target["type"]
+            if target_type == "file":
                 logger.info("Migrating file %s...", source_path.name)
                 manifest_additions = migrate_file(
                     source_path, v1_storage_path, blob_store
                 )
-            elif type == "directory":
+            elif target_type == "directory":
                 logger.info("Migrating directory %s...", source_path.name)
                 manifest_additions = migrate_directory(
                     source_path, v1_storage_path, blob_store
                 )
             else:
-                logger.warning("Unknown type %s for file %s.", type, source_path.name)
+                logger.warning(
+                    "Unknown type %s for file %s.", target_type, source_path.name
+                )
             v2_manifest["targets"].update(manifest_additions)
         with profile_manifest_file.open("w", encoding="utf-8") as f:
             json.dump(v2_manifest, f, indent=4, default=str)
@@ -121,6 +125,7 @@ def migrate_directory(
     )
     return manifest_additions
 
+
 def _cleanup_v1_profile_data(profile_path: Path) -> None:
     # Verify manifest is valid V2 before cleanup
     try:
@@ -128,13 +133,21 @@ def _cleanup_v1_profile_data(profile_path: Path) -> None:
         with profile_manifest_file.open("r", encoding="utf-8") as f:
             written = json.load(f)
         if written.get("version") != 2:
-            logger.error("Manifest verification failed for %s; skipping cleanup", profile_path.name)
+            logger.error(
+                "Manifest verification failed for %s; skipping cleanup",
+                profile_path.name,
+            )
             return
         # delete all files and directories in profile except manifest
-        for child in profile_path.iterdir():  
+        for child in profile_path.iterdir():
             if child == profile_manifest_file:
                 continue
-            child.unlink()
+            for root, dirs, files in child.walk(top_down=False):
+                for name in files:
+                    (root / name).unlink()
+                for name in dirs:
+                    (root / name).rmdir()
+            child.rmdir()
     except Exception:
         logger.error("Failed to cleanup V1 profile data for %s", profile_path.name)
         raise

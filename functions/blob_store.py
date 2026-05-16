@@ -52,8 +52,8 @@ class BlobStore:
     def _hash_and_cache(self, path: Path) -> str:
         stat = path.stat()
         entry = self.cache.get(str(path))
-        logger.debug("Getting hash for %s from cache", path)
         if entry and entry["size"] == stat.st_size and entry["mtime"] == stat.st_mtime:
+            logger.debug("Cache hit for %s", path)
             return entry["hash"]
         file_hash = self._hash(path)
         self.cache[str(path)] = FileMeta(
@@ -102,10 +102,6 @@ class BlobStore:
         tmp_path.rename(dest)
         if not dest.exists():
             raise RuntimeError("Failed to store file %s", source_path)
-        dest_stat = dest.stat()
-        self.cache[str(source_path)] = FileMeta(
-            size=dest_stat.st_size, mtime=dest_stat.st_mtime, hash=file_hash
-        )
         logger.debug("Stored file %s as %s", source_path, dest_rel)
         return dest_rel, True
 
