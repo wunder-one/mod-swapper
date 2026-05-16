@@ -9,25 +9,32 @@ import argparse
 import logging
 
 from config.logging_setup import configure_logging
+from config.user_settings import UserSettings
 from functions.file_hash_cache import FileHashCache
 from functions.hashed_store_ops import load_profile_to_live
-from config.user_settings import UserSettings
 
 logger = logging.getLogger(__name__)
 
 
 def scratch():
     parser = argparse.ArgumentParser(
-        description="Scratch: save live mods into a profile snapshot.",
+        description="Scratch: load_profile_to_live — restore/remove files so live paths match the profile snapshot.",
     )
     parser.add_argument(
-        "profile_name", type=str, help="Name of the profile folder to write"
+        "profile_name",
+        type=str,
+        help="Name of the profile folder under profiles snapshot dir",
     )
     args = parser.parse_args()
 
-    file_hash_cache = FileHashCache.load_cache()
     user_settings = UserSettings.load_settings()
-    load_profile_to_live(args.profile_name, file_hash_cache, user_settings)
+    file_hash_cache = FileHashCache.load_cache()
+    load_profile_to_live(
+        args.profile_name,
+        file_hash_cache,
+        user_settings,
+    )
+
 
 if __name__ == "__main__":
     configure_logging()

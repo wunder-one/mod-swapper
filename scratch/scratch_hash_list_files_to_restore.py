@@ -17,10 +17,12 @@ logger = logging.getLogger(__name__)
 
 def scratch():
     parser = argparse.ArgumentParser(
-        description="Scratch: save live mods into a profile snapshot.",
+        description="Scratch: _list_files_to_restore — log (live_path, storage_path) pairs that load_profile_to_live would restore.",
     )
     parser.add_argument(
-        "profile_name", type=str, help="Name of the profile folder to write"
+        "profile_name",
+        type=str,
+        help="Name of the profile folder under profiles snapshot dir",
     )
     args = parser.parse_args()
 

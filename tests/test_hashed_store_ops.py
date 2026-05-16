@@ -77,14 +77,14 @@ class SaveLiveToProfileTests(unittest.TestCase):
                 live_dir,
                 file_hash_cache,
                 excluded_files=excluded_files,
-                exclude_dirs=excluded_dirs,
+                excluded_dirs=excluded_dirs,
             )
             # File inputs should call store_file with the same exclusions.
             store_file_mock.assert_called_once_with(
                 live_file,
                 file_hash_cache,
                 excluded_files=excluded_files,
-                exclude_dirs=excluded_dirs,
+                excluded_dirs=excluded_dirs,
             )
             # Missing paths should be warned about exactly once.
             warning_mock.assert_called_once_with(
