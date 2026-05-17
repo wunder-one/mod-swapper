@@ -4,11 +4,13 @@ from pathlib import Path
 
 from constants import PROFILES_SNAPSHOT_DIR
 from functions.blob_store import BlobStore
+from ui.migration_progress import MigrationProgress
 
 logger = logging.getLogger(__name__)
 
 
-def migrate_file_store(blob_store: BlobStore):
+def migrate_file_store(blob_store: BlobStore, migration_progress_window: MigrationProgress):
+    # Verification
     if not PROFILES_SNAPSHOT_DIR.is_dir():
         logger.info("No profiles directory; nothing to migrate.")
         return
@@ -22,13 +24,20 @@ def migrate_file_store(blob_store: BlobStore):
         logger.info("No profiles to migrate.")
         return
     logger.info("Migrating file store...")
+
+    # Start Migration
+    migration_progress_window.set_total_profiles(len(profiles))
     failed = []
-    for child in profiles:
+    for i, profile in enumerate(profiles):
         try:
-            migrate_profile(child, blob_store)
+            migration_progress_window.update_progress(i)
+            migration_progress_window.set_status(f"Processing profile {profile.name}...")
+            migrate_profile(profile, blob_store)
         except Exception as e:
-            logger.error("Failed to migrate %s profile: %s", child.name, e)
-            failed.append(child.name)
+            logger.error("Failed to migrate %s profile: %s", profile.name, e)
+            failed.append(profile.name)
+    migration_progress_window.update_progress(len(profiles))
+    migration_progress_window.set_status("Migration complete!")
     if failed:
         raise RuntimeError(
             "Failed to migrate %d profile(s): %s" % (len(failed), ", ".join(failed))

@@ -26,22 +26,23 @@ root.withdraw()
 simulate_profiles = 50
 step = 0
 
-dialog = MigrationProgress(root, total_profiles=simulate_profiles)
+dialog = MigrationProgress(root)
 
 
 def simulate():
+    dialog.set_total_profiles(simulate_profiles)
     root.after(800, dialog_update_progress)
 
 
 def dialog_update_progress():
     global step
-    dialog.update_progress(step / simulate_profiles)
+    dialog.update_progress(step)
     step += 1
     if step < simulate_profiles:
         dialog.set_status(f"Processing profile {step}...")
         root.after(800, dialog_update_progress)
     else:
-        dialog.update_progress(1.0)
+        dialog.update_progress(simulate_profiles)
         dialog.set_status("Migration complete!")
         root.after(600, cleanup)
 
