@@ -37,47 +37,78 @@ def migrate_file_store(blob_store: BlobStore):
 
 def migrate_profile(profile_path: Path, blob_store: BlobStore):
     logger.info("Migrating profile %s...", profile_path.name)
+    profile_manifest_file = profile_path / "manifest.json"
+    legacy_manifest_file = profile_path / "manifest.json.legacy"
+    needs_cleanup = False
+
     try:
-        profile_manifest_file = profile_path / "manifest.json"
-        if not profile_manifest_file.exists():
-            raise ValueError("Profile %s has no manifest file." % profile_path.name)
-        with profile_manifest_file.open("r", encoding="utf-8") as f:
-            v1_manifest = json.load(f)
-        if v1_manifest["version"] > 1:
-            logger.info("Profile %s is already migrated.", profile_path.name)
-            return
-        v2_manifest = {"version": 2, "targets": {}}
-        for target in v1_manifest["targets"]:
+        if legacy_manifest_file.exists():
             try:
-                source_path = Path(target["source"])
-                v1_storage_path = Path(target["storage"])
-                target_type = target["type"]
-                if target_type == "file":
-                    logger.info("Migrating file %s...", source_path.name)
-                    manifest_additions = migrate_file(
-                        source_path, v1_storage_path, blob_store
-                    )
-                elif target_type == "directory":
-                    logger.info("Migrating directory %s...", source_path.name)
-                    manifest_additions = migrate_directory(
-                        source_path, v1_storage_path, blob_store
-                    )
-                else:
-                    logger.warning(
-                        "Unknown type %s for file %s.", target_type, source_path.name
-                    )
-                    manifest_additions = {}
-                v2_manifest["targets"].update(manifest_additions)
-            except Exception as e:
-                logger.warning(
-                    "Skipping target %s: %s", target.get("source", "unknown"), e
+                with profile_manifest_file.open("r", encoding="utf-8") as f:
+                    existing = json.load(f)
+                if existing.get("version") == 2:
+                    needs_cleanup = True
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        if not needs_cleanup:
+            if legacy_manifest_file.exists():
+                logger.info(
+                    "Restoring legacy manifest for %s and retrying migration.",
+                    profile_path.name,
                 )
-        with profile_manifest_file.open("w", encoding="utf-8") as f:
-            json.dump(v2_manifest, f, indent=4, default=str)
+                if profile_manifest_file.exists():
+                    profile_manifest_file.unlink()
+                legacy_manifest_file.replace(profile_manifest_file)
+
+            if not profile_manifest_file.exists():
+                raise ValueError(
+                    "Profile %s has no manifest file." % profile_path.name
+                )
+            with profile_manifest_file.open("r", encoding="utf-8") as f:
+                v1_manifest = json.load(f)
+            if v1_manifest["version"] > 1:
+                logger.info("Profile %s is already migrated.", profile_path.name)
+                return
+            v2_manifest = {"version": 2, "targets": {}}
+            for target in v1_manifest["targets"]:
+                try:
+                    source_path = Path(target["source"])
+                    v1_storage_path = Path(target["storage"])
+                    target_type = target["type"]
+                    if target_type == "file":
+                        logger.info("Migrating file %s...", source_path.name)
+                        manifest_additions = migrate_file(
+                            source_path, v1_storage_path, blob_store
+                        )
+                    elif target_type == "directory":
+                        logger.info("Migrating directory %s...", source_path.name)
+                        manifest_additions = migrate_directory(
+                            source_path, v1_storage_path, blob_store
+                        )
+                    else:
+                        logger.warning(
+                            "Unknown type %s for file %s.",
+                            target_type,
+                            source_path.name,
+                        )
+                        manifest_additions = {}
+                    v2_manifest["targets"].update(manifest_additions)
+                except Exception as e:
+                    logger.warning(
+                        "Skipping target %s: %s", target.get("source", "unknown"), e
+                    )
+
+            profile_manifest_file.rename(legacy_manifest_file)
+            with profile_manifest_file.open("w", encoding="utf-8") as f:
+                json.dump(v2_manifest, f, indent=4, default=str)
+            needs_cleanup = True
     except Exception as e:
         logger.error("Failed to migrate profile %s: %s", profile_path.name, e)
         raise
-    _cleanup_v1_profile_data(profile_path)
+
+    if needs_cleanup:
+        _cleanup_v1_profile_data(profile_path)
 
 
 def migrate_file(
@@ -130,7 +161,7 @@ def migrate_directory(
         " - Stored directory %s:\n"
         "     %d copied files\n"
         "     %d already stored files (skipped)",
-        v1_storage_path,
+        source_path,
         copied_files_count,
         skipped_files_count,
     )
@@ -138,9 +169,9 @@ def migrate_directory(
 
 
 def _cleanup_v1_profile_data(profile_path: Path) -> None:
-    # Verify manifest is valid V2 before cleanup
+    profile_manifest_file = profile_path / "manifest.json"
+    legacy_manifest_file = profile_path / "manifest.json.legacy"
     try:
-        profile_manifest_file = profile_path / "manifest.json"
         with profile_manifest_file.open("r", encoding="utf-8") as f:
             written = json.load(f)
         if written.get("version") != 2:
@@ -149,20 +180,26 @@ def _cleanup_v1_profile_data(profile_path: Path) -> None:
                 profile_path.name,
             )
             return
-        # delete all files and directories in profile except manifest
         for child in profile_path.iterdir():
-            if child == profile_manifest_file:
+            if child in (profile_manifest_file, legacy_manifest_file):
                 continue
             if not child.is_dir():
-                child.unlink()
+                child.unlink(missing_ok=True)
                 continue
             for root, dirs, files in child.walk(top_down=False):
                 for name in files:
-                    (root / name).unlink()
+                    (root / name).unlink(missing_ok=True)
                 for name in dirs:
-                    (root / name).rmdir()
-            child.rmdir()
+                    try:
+                        (root / name).rmdir()
+                    except (FileNotFoundError, OSError):
+                        pass
+            try:
+                child.rmdir()
+            except (FileNotFoundError, OSError):
+                pass
     except Exception:
         logger.error("Failed to cleanup V1 profile data for %s", profile_path.name)
         raise
+    legacy_manifest_file.unlink(missing_ok=True)
     logger.info("Cleaned up V1 profile data for %s", profile_path.name)

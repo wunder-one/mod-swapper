@@ -34,18 +34,20 @@ def main():
     blob_store = BlobStore.load_cache()
 
     migration_state = MigrationState.load_state()
-    if not migration_state.migration_state:
-        try:
-            migrate_file_store(blob_store)
-            migration_state.update_state(True)
-        except Exception as e:
-            logger.error("Migration failed: %s", e)
+
 
     set_default_color_theme(_meipass_path("ui/theme.json"))
     # set_default_color_theme("green")
     app = ui.app.App(prof_state, user_settings, blob_store)
     app.iconbitmap(_meipass_path("assets/icons/magic_icon.ico"))
     app.mainloop()
+
+    if not migration_state.migration_state:
+        try:
+            migrate_file_store(blob_store)
+            migration_state.update_state(True)
+        except Exception as e:
+            logger.error("Migration failed: %s", e)
 
     logger.info("Saving configuration...")
     prof_state.save_config()
