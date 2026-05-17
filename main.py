@@ -8,7 +8,7 @@ from config.logging_setup import configure_logging
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from functions.blob_store import BlobStore
-from functions.migrate import migrate_file_store
+from functions.migrate import migrate_file_store, MigrationCancelledError
 from config.migration_state import MigrationState
 from customtkinter import set_default_color_theme
 
@@ -24,14 +24,22 @@ def _meipass_path(relative_path: str) -> str:
 
 def _run_migration(app, blob_store, migration_state):
     progress = ui.migration_progress.MigrationProgress(app)
+    cancelled = False
     try:
         migrate_file_store(blob_store, progress)
         migration_state.update_state(True)
+    except MigrationCancelledError:
+        logger.info("Migration cancelled by user.")
+        cancelled = True
     except Exception as e:
         logger.error("Migration failed: %s", e)
     finally:
         progress.destroy()
-    app.deiconify()
+
+    if cancelled:
+        app.quit()
+    else:
+        app.deiconify()
 
 
 def main():

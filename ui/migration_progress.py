@@ -10,6 +10,7 @@ class MigrationProgress(customtkinter.CTkToplevel):
         super().__init__(master)
         self.total_profiles = total_profiles
         self.step = 0
+        self.cancelled = False
 
         self.title("Migration Progress")
         self.resizable(False, False)
@@ -36,15 +37,31 @@ class MigrationProgress(customtkinter.CTkToplevel):
         self.status_label = customtkinter.CTkLabel(
             self, text="", fg_color="transparent"
         )
-        self.status_label.grid(row=2, column=0, padx=20, pady=(5, 10), sticky="ew")
+        self.status_label.grid(row=2, column=0, padx=20, pady=(5, 5), sticky="ew")
+
+        self.cancel_button = customtkinter.CTkButton(
+            self, text="Cancel", command=self._on_cancel, width=80
+        )
+        self.cancel_button.grid(row=3, column=0, padx=20, pady=(0, 15), sticky="e")
+
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
 
         x = master.winfo_screenwidth() // 2 - 180
-        y = master.winfo_screenheight() // 2 - 70
-        self.geometry(f"360x140+{x}+{y}")
+        y = master.winfo_screenheight() // 2 - 85
+        self.geometry(f"360x170+{x}+{y}")
         self.deiconify()
         self.lift()
         self.focus_set()
         self.update()
+
+    def _on_cancel(self):
+        self.cancelled = True
+        self.cancel_button.configure(state="disabled")
+        self.status_label.configure(text="Cancelling...")
+
+    def check_cancelled(self) -> bool:
+        self.master.update()
+        return self.cancelled
 
     def set_total_profiles(self, total_profiles: int):
         print("Setting Total Profiles")

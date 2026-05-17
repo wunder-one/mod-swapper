@@ -9,7 +9,14 @@ from ui.migration_progress import MigrationProgress
 logger = logging.getLogger(__name__)
 
 
-def migrate_file_store(blob_store: BlobStore, migration_progress_window: MigrationProgress):
+class MigrationCancelledError(Exception):
+    """Raised when the user cancels the migration from the progress dialog."""
+
+
+def migrate_file_store(
+    blob_store: BlobStore,
+    migration_progress_window: MigrationProgress | None = None,
+):
     # Verification
     if not PROFILES_SNAPSHOT_DIR.is_dir():
         logger.info("No profiles directory; nothing to migrate.")
@@ -26,25 +33,36 @@ def migrate_file_store(blob_store: BlobStore, migration_progress_window: Migrati
     logger.info("Migrating file store...")
 
     # Start Migration
-    migration_progress_window.set_total_profiles(len(profiles))
+    if migration_progress_window is not None:
+        migration_progress_window.set_total_profiles(len(profiles))
     failed = []
     for i, profile in enumerate(profiles):
-        try:
+        if migration_progress_window is not None:
+            if migration_progress_window.check_cancelled():
+                raise MigrationCancelledError()
             migration_progress_window.update_progress(i)
             migration_progress_window.set_status(f"Processing profile {profile.name}...")
-            migrate_profile(profile, blob_store)
+        try:
+            migrate_profile(profile, blob_store, migration_progress_window)
+        except MigrationCancelledError:
+            raise
         except Exception as e:
             logger.error("Failed to migrate %s profile: %s", profile.name, e)
             failed.append(profile.name)
-    migration_progress_window.update_progress(len(profiles))
-    migration_progress_window.set_status("Migration complete!")
+    if migration_progress_window is not None:
+        migration_progress_window.update_progress(len(profiles))
+        migration_progress_window.set_status("Migration complete!")
     if failed:
         raise RuntimeError(
             "Failed to migrate %d profile(s): %s" % (len(failed), ", ".join(failed))
         )
 
 
-def migrate_profile(profile_path: Path, blob_store: BlobStore):
+def migrate_profile(
+    profile_path: Path,
+    blob_store: BlobStore,
+    progress_window: MigrationProgress | None = None,
+):
     logger.info("Migrating profile %s...", profile_path.name)
     profile_manifest_file = profile_path / "manifest.json"
     legacy_manifest_file = profile_path / "manifest.json.legacy"
@@ -81,6 +99,8 @@ def migrate_profile(profile_path: Path, blob_store: BlobStore):
                 return
             v2_manifest = {"version": 2, "targets": {}}
             for target in v1_manifest["targets"]:
+                if progress_window is not None and progress_window.check_cancelled():
+                    raise MigrationCancelledError()
                 try:
                     source_path = Path(target["source"])
                     v1_storage_path = Path(target["storage"])
@@ -88,12 +108,12 @@ def migrate_profile(profile_path: Path, blob_store: BlobStore):
                     if target_type == "file":
                         logger.info("Migrating file %s...", source_path.name)
                         manifest_additions = migrate_file(
-                            source_path, v1_storage_path, blob_store
+                            source_path, v1_storage_path, blob_store, progress_window
                         )
                     elif target_type == "directory":
                         logger.info("Migrating directory %s...", source_path.name)
                         manifest_additions = migrate_directory(
-                            source_path, v1_storage_path, blob_store
+                            source_path, v1_storage_path, blob_store, progress_window
                         )
                     else:
                         logger.warning(
@@ -103,6 +123,8 @@ def migrate_profile(profile_path: Path, blob_store: BlobStore):
                         )
                         manifest_additions = {}
                     v2_manifest["targets"].update(manifest_additions)
+                except MigrationCancelledError:
+                    raise
                 except Exception as e:
                     logger.warning(
                         "Skipping target %s: %s", target.get("source", "unknown"), e
@@ -112,6 +134,8 @@ def migrate_profile(profile_path: Path, blob_store: BlobStore):
             with profile_manifest_file.open("w", encoding="utf-8") as f:
                 json.dump(v2_manifest, f, indent=4, default=str)
             needs_cleanup = True
+    except MigrationCancelledError:
+        raise
     except Exception as e:
         logger.error("Failed to migrate profile %s: %s", profile_path.name, e)
         raise
@@ -124,7 +148,10 @@ def migrate_file(
     source_path: Path,
     v1_storage_path: Path,
     blob_store: BlobStore,
+    progress_window: MigrationProgress | None = None,
 ) -> dict:
+    if progress_window is not None and progress_window.check_cancelled():
+        raise MigrationCancelledError()
     manifest_additions = {}
     dest_rel, copied_to_store = blob_store.store_file(v1_storage_path)
     if copied_to_store:
@@ -139,6 +166,7 @@ def migrate_directory(
     source_path: Path,
     v1_storage_path: Path,
     blob_store: BlobStore,
+    progress_window: MigrationProgress | None = None,
 ) -> dict:
     logger.debug("Migrating directory %s...", source_path.name)
     manifest_additions = {}
@@ -146,6 +174,8 @@ def migrate_directory(
     copied_files_count = 0
     for root, _, files in v1_storage_path.walk():
         for filename in files:
+            if progress_window is not None and progress_window.check_cancelled():
+                raise MigrationCancelledError()
             v1_storage_file_path = root / filename
             source_file_path = source_path / v1_storage_file_path.relative_to(
                 v1_storage_path
