@@ -41,7 +41,9 @@ def migrate_file_store(
             if migration_progress_window.check_cancelled():
                 raise MigrationCancelledError()
             migration_progress_window.update_progress(i)
-            migration_progress_window.set_status(f"Processing profile {profile.name}...")
+            migration_progress_window.set_status(
+                f"Processing profile {profile.name}..."
+            )
         try:
             migrate_profile(profile, blob_store, migration_progress_window)
         except MigrationCancelledError:
@@ -75,7 +77,7 @@ def migrate_profile(
                     existing = json.load(f)
                 if existing.get("version") == 2:
                     needs_cleanup = True
-            except (json.JSONDecodeError, OSError):
+            except json.JSONDecodeError, OSError:
                 pass
 
         if not needs_cleanup:
@@ -89,9 +91,7 @@ def migrate_profile(
                 legacy_manifest_file.replace(profile_manifest_file)
 
             if not profile_manifest_file.exists():
-                raise ValueError(
-                    "Profile %s has no manifest file." % profile_path.name
-                )
+                raise ValueError("Profile %s has no manifest file." % profile_path.name)
             with profile_manifest_file.open("r", encoding="utf-8") as f:
                 v1_manifest = json.load(f)
             if v1_manifest["version"] > 1:
@@ -231,11 +231,11 @@ def _cleanup_v1_profile_data(profile_path: Path) -> None:
                 for name in dirs:
                     try:
                         (root / name).rmdir()
-                    except (FileNotFoundError, OSError):
+                    except FileNotFoundError, OSError:
                         pass
             try:
                 child.rmdir()
-            except (FileNotFoundError, OSError):
+            except FileNotFoundError, OSError:
                 pass
     except Exception:
         logger.error("Failed to cleanup V1 profile data for %s", profile_path.name)
