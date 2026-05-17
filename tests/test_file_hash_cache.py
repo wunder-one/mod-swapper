@@ -2,65 +2,46 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from functions.blob_store import BlobStore
 
 
-class BlobStoreMtimeTests(unittest.TestCase):
-    def test_get_hash_uses_cache_when_file_is_unchanged(self):
-        # Create an isolated temporary filesystem for the test.
+class BlobStoreCacheTests(unittest.TestCase):
+    def test_store_file_dedup_reuses_existing_blob(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            # This file stands in for a mod file whose hash we cache.
-            source_file = root / "mod.txt"
-            source_file.write_text("v1", encoding="utf-8")
+            store = BlobStore.load_cache(store_dir=root / "store")
 
-            # Load a cache instance backed by a temporary store directory.
-            cache = BlobStore.load_cache(store_dir=root / "store")
+            src1 = root / "src.txt"
+            src1.write_text("same content", encoding="utf-8")
 
-            # Wrap _hash_file so we can count real hash computations.
-            with patch.object(
-                BlobStore, "_hash_file", wraps=BlobStore._hash_file
-            ) as hash_mock:
-                # First call computes and caches the hash.
-                first_hash = cache.get_hash(source_file)
-                # Second call should reuse cached value because file is unchanged.
-                second_hash = cache.get_hash(source_file)
+            dest_rel1, copied1 = store.store_file(src1)
+            self.assertTrue(copied1, "first store should copy")
 
-            # Cached value should match the original computed hash.
-            self.assertEqual(first_hash, second_hash)
-            # Only one underlying hash computation should have happened.
-            self.assertEqual(hash_mock.call_count, 1)
+            src2 = root / "src-dup.txt"
+            src2.write_text("same content", encoding="utf-8")
 
-    def test_get_hash_recomputes_when_file_mtime_changes(self):
-        # Create an isolated temporary filesystem for the test.
+            dest_rel2, copied2 = store.store_file(src2)
+            self.assertFalse(copied2, "duplicate content should not copy")
+            self.assertEqual(dest_rel1, dest_rel2, "blob path should match")
+
+    def test_modified_content_produces_different_hash(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            # Initial file contents represent the first file state.
-            source_file = root / "mod.txt"
-            source_file.write_text("v1", encoding="utf-8")
+            store = BlobStore.load_cache(store_dir=root / "store")
 
-            # Prime the cache with the file's initial hash and mtime.
-            cache = BlobStore.load_cache(store_dir=root / "store")
-            first_hash = cache.get_hash(source_file)
+            src = root / "mod.txt"
+            src.write_text("v1", encoding="utf-8")
 
-            # Ensure the next write gets a distinct mtime on Windows filesystems.
+            dest_rel1, copied1 = store.store_file(src)
+            self.assertTrue(copied1)
+
             time.sleep(0.02)
-            # Change file contents so the hash should become different.
-            source_file.write_text("v2", encoding="utf-8")
+            src.write_text("v2", encoding="utf-8")
 
-            # Wrap _hash_file so we can confirm recomputation occurs.
-            with patch.object(
-                BlobStore, "_hash_file", wraps=BlobStore._hash_file
-            ) as hash_mock:
-                # Cache should detect mtime change and re-hash the file.
-                second_hash = cache.get_hash(source_file)
-
-            # Exactly one hash call during this second get_hash invocation.
-            self.assertEqual(hash_mock.call_count, 1)
-            # New content should produce a different hash value.
-            self.assertNotEqual(first_hash, second_hash)
+            dest_rel2, copied2 = store.store_file(src)
+            self.assertTrue(copied2)
+            self.assertNotEqual(dest_rel1, dest_rel2)
 
 
 if __name__ == "__main__":

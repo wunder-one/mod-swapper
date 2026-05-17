@@ -32,6 +32,7 @@ dialog = MigrationProgress(root, total_profiles=simulate_profiles)
 def simulate():
     root.after(800, dialog_update_progress)
 
+
 def dialog_update_progress():
     global step
     dialog.update_progress(step / simulate_profiles)
@@ -43,6 +44,7 @@ def dialog_update_progress():
         dialog.update_progress(1.0)
         dialog.set_status("Migration complete!")
         root.after(600, cleanup)
+
 
 def cleanup():
     dialog.destroy()
