@@ -30,8 +30,9 @@ def scratch():
 
     prof_state = ProfileState.load_config()
     user_settings = UserSettings.load_settings()
-    blob_store = BlobStore()
+    blob_store = BlobStore.load_cache()
     swap_profile(args.profile_to_load, prof_state, blob_store, user_settings)
+    blob_store.save_cache()
     logger.info(
         "Scratch swap finished; active profile is %r.", prof_state.active_profile
     )

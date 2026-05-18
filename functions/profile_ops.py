@@ -152,7 +152,7 @@ def _list_files_to_restore(
 
         # The blob path is content-addressed: <hash[:2]>/<hash[2:]>
         expected_hash = str(storage_rel_str).replace("\\", "").replace("/", "")
-        actual_hash = blob_store.hash_file(live_path)
+        actual_hash = blob_store.get_cached_hash(live_path)
 
         if actual_hash != expected_hash:
             logger.debug(
@@ -277,6 +277,7 @@ def swap_profile(
             profile_name,
         )
         save_live_to_profile(old_profile, blob_store, user_settings)
+    blob_store.save_cache()
 
     try:
         load_profile_to_live(profile_name, blob_store, user_settings)
@@ -365,5 +366,6 @@ def overwrite_profile(
         backup_dir.rename(profile_dir)
         raise
     _rmtree(backup_dir)
+    blob_store.save_cache()
     profile_state.active_profile = profile_to_overwrite
     profile_state.save_config()

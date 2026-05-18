@@ -28,7 +28,7 @@ def scratch():
     args = parser.parse_args()
 
     user_settings = UserSettings.load_settings()
-    blob_store = BlobStore()
+    blob_store = BlobStore.load_cache()
     load_profile_to_live(
         args.profile_name,
         blob_store,

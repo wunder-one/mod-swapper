@@ -94,7 +94,7 @@ class ListFilesToRestoreTests(unittest.TestCase):
             store_dir = root / "store"
             profiles_dir = root / "profiles"
             profiles_dir.mkdir(parents=True)
-            store = BlobStore(store_dir=store_dir)
+            store = BlobStore.load_cache(store_dir=store_dir)
 
             # Create the "correct" blob (v1 content)
             blob_src = root / "v1.txt"
@@ -127,7 +127,7 @@ class ListFilesToRestoreTests(unittest.TestCase):
             store_dir = root / "store"
             profiles_dir = root / "profiles"
             profiles_dir.mkdir(parents=True)
-            store = BlobStore(store_dir=store_dir)
+            store = BlobStore.load_cache(store_dir=store_dir)
 
             # Create live file and store it
             live_file = root / "live.txt"
@@ -155,7 +155,7 @@ class ListFilesToRestoreTests(unittest.TestCase):
             store_dir = root / "store"
             profiles_dir = root / "profiles"
             profiles_dir.mkdir(parents=True)
-            store = BlobStore(store_dir=store_dir)
+            store = BlobStore.load_cache(store_dir=store_dir)
 
             # Create a blob but no live file
             blob_src = root / "blob.txt"

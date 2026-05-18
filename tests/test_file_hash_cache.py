@@ -10,7 +10,7 @@ class BlobStoreCacheTests(unittest.TestCase):
     def test_store_file_dedup_reuses_existing_blob(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            store = BlobStore(store_dir=root / "store")
+            store = BlobStore.load_cache(store_dir=root / "store")
 
             src1 = root / "src.txt"
             src1.write_text("same content", encoding="utf-8")
@@ -28,7 +28,7 @@ class BlobStoreCacheTests(unittest.TestCase):
     def test_modified_content_produces_different_hash(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            store = BlobStore(store_dir=root / "store")
+            store = BlobStore.load_cache(store_dir=root / "store")
 
             src = root / "mod.txt"
             src.write_text("v1", encoding="utf-8")
