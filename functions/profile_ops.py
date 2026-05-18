@@ -218,8 +218,7 @@ def _list_files_to_remove(
                     ):
                         files_to_remove.append(file_path)
     logger.info(
-        "Removing extra files not used in '%s' from live:\n"
-        "     %d files removed",
+        "Removing extra files not used in '%s' from live:\n     %d files removed",
         profile_name,
         len(files_to_remove),
     )

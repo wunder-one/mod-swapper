@@ -30,12 +30,16 @@ def scan_paths(live_paths: list[Path]) -> list[tuple[str, str, int, str]]:
         print(f"Scanning {root}")
         if root.is_file():
             rel_path = root.relative_to(root.parent)
-            rows.append((str(rel_path), hash_file(root), root.stat().st_size, str(root)))
+            rows.append(
+                (str(rel_path), hash_file(root), root.stat().st_size, str(root))
+            )
         else:
             for i, file in enumerate(sorted(root.rglob("*")), start=1):
                 if file.is_file():
                     rel_path = file.relative_to(root.parent)
-                    rows.append((str(rel_path), hash_file(file), file.stat().st_size, str(file)))
+                    rows.append(
+                        (str(rel_path), hash_file(file), file.stat().st_size, str(file))
+                    )
                     print(f"\r  {i} files scanned...", end="", flush=True)
         print()
     return rows

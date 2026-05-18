@@ -115,9 +115,7 @@ class ListFilesToRestoreTests(unittest.TestCase):
             manifest_file.parent.mkdir(parents=True, exist_ok=True)
             manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
 
-            with patch(
-                "functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir
-            ):
+            with patch("functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir):
                 files_to_restore = _list_files_to_restore(profile_name, store)
 
             self.assertEqual(len(files_to_restore), 1)
@@ -146,9 +144,7 @@ class ListFilesToRestoreTests(unittest.TestCase):
             manifest_file.parent.mkdir(parents=True, exist_ok=True)
             manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
 
-            with patch(
-                "functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir
-            ):
+            with patch("functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir):
                 files_to_restore = _list_files_to_restore(profile_name, store)
 
             self.assertEqual(len(files_to_restore), 0)
@@ -177,9 +173,7 @@ class ListFilesToRestoreTests(unittest.TestCase):
             manifest_file.parent.mkdir(parents=True, exist_ok=True)
             manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
 
-            with patch(
-                "functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir
-            ):
+            with patch("functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir):
                 files_to_restore = _list_files_to_restore(profile_name, store)
 
             self.assertEqual(len(files_to_restore), 1)
