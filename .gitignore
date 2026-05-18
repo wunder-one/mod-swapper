@@ -1,6 +1,8 @@
+# Project specific and generic
 untracked/
 unused/
 previous_builds/
+logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
