@@ -11,7 +11,7 @@ import logging
 from config.logging_setup import configure_logging
 from config.user_settings import UserSettings
 from functions.blob_store import BlobStore
-from functions.hashed_store_ops import save_live_to_profile
+from functions.profile_ops import save_live_to_profile
 
 logger = logging.getLogger(__name__)
 

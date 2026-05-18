@@ -10,7 +10,7 @@ import logging
 
 from config.logging_setup import configure_logging
 from config.user_settings import UserSettings
-from functions.hashed_store_ops import _list_files_to_remove
+from functions.profile_ops import _list_files_to_remove
 
 logger = logging.getLogger(__name__)
 

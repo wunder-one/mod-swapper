@@ -6,7 +6,7 @@ import customtkinter
 
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
-from functions.file_actions import delete_profile
+from functions.profile_ops import delete_profile
 from ui.wrapping_label import WrappingLabel
 
 logger = logging.getLogger(__name__)
