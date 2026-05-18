@@ -42,6 +42,7 @@ def scan_paths(live_paths: list[Path]) -> list[tuple[str, str, int, str]]:
 
 
 def main():
+    start = datetime.datetime.now()
     profile_state = json.loads(PROFILE_STATE_FILE.read_text(encoding="utf-8"))
     profile_name = profile_state["active_profile"]
 
@@ -62,6 +63,8 @@ def main():
             f.write(f"{rel_path}\t{digest}\t{size}\t{full_path}\n")
 
     print(f"Wrote {len(rows)} files to {out}")
+    elapsed = datetime.datetime.now() - start
+    print(f"Done in {elapsed.total_seconds():.2f}s")
 
 
 if __name__ == "__main__":
