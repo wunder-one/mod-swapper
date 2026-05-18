@@ -197,7 +197,7 @@ def migrate_directory(
             # add file to manifest
             manifest_additions[str(source_file_path)] = str(blob_store_rel)
     logger.info(
-        " - Stored directory %s:\n"
+        "Stored directory %s:\n"
         "     %d copied files\n"
         "     %d already stored files (skipped)",
         source_path,

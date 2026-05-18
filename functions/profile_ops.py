@@ -171,9 +171,9 @@ def _list_files_to_restore(
                 restored_files_count += 1
                 files_to_restore.append((live_path, storage_path))
     logger.info(
-        " - Restoring %s from snapshot:\n"
-        "     %d files to restore\n"
-        "     %d files already in live",
+        "Copying files for '%s' from snapshot:\n"
+        "     %d files copied\n"
+        "     %d files already in live (skipped)",
         profile_name,
         restored_files_count,
         skipped_files_count,
@@ -222,7 +222,8 @@ def _list_files_to_remove(
                     ):
                         files_to_remove.append(file_path)
     logger.info(
-        " - Removing %s from live:\n     %d files to remove",
+        "Removing extra files not used in '%s' from live:\n"
+        "     %d files removed",
         profile_name,
         len(files_to_remove),
     )
