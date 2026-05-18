@@ -52,7 +52,7 @@ def main():
     user_settings = UserSettings.load_settings()
     logger.info("Game folder: %s", user_settings.game_folder)
 
-    blob_store = BlobStore.load_cache()
+    blob_store = BlobStore()
     migration_state = MigrationState.load_state()
 
     set_default_color_theme(_meipass_path("ui/theme.json"))
@@ -69,7 +69,6 @@ def main():
     logger.info("Saving configuration...")
     prof_state.save_config()
     user_settings.save_settings()
-    blob_store.save_cache()
     logger.info("Shutdown complete.")
 
 

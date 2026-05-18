@@ -148,28 +148,24 @@ def _list_files_to_restore(
             logger.debug("File %s does not exist. Adding to restore list.", live_path)
             restored_files_count += 1
             files_to_restore.append((live_path, storage_path))
+            continue
+
+        # The blob path is content-addressed: <hash[:2]>/<hash[2:]>
+        expected_hash = str(storage_rel_str).replace("\\", "").replace("/", "")
+        actual_hash = blob_store.hash_file(live_path)
+
+        if actual_hash != expected_hash:
+            logger.debug(
+                "File %s hash mismatch (expected %s, got %s). Adding to restore list.",
+                live_path,
+                expected_hash[:16],
+                actual_hash[:16],
+            )
+            restored_files_count += 1
+            files_to_restore.append((live_path, storage_path))
         else:
-            live_file_meta = blob_store.get_file_meta(live_path)
-            if live_file_meta:
-                stat = live_path.stat()
-                if (
-                    live_file_meta["size"] != stat.st_size
-                    or live_file_meta["mtime"] != stat.st_mtime
-                ):
-                    logger.debug(
-                        "File %s has changed. Adding to restore list.", live_path
-                    )
-                    restored_files_count += 1
-                    files_to_restore.append((live_path, storage_path))
-                else:
-                    logger.debug("File %s is already live. Skipping.", live_path)
-                    skipped_files_count += 1
-            else:
-                logger.debug(
-                    "File %s is not in cache. Adding to restore list.", live_path
-                )
-                restored_files_count += 1
-                files_to_restore.append((live_path, storage_path))
+            logger.debug("File %s matches expected hash. Skipping.", live_path)
+            skipped_files_count += 1
     logger.info(
         "Copying files for '%s' from snapshot:\n"
         "     %d files copied\n"
@@ -282,7 +278,6 @@ def swap_profile(
             profile_name,
         )
         save_live_to_profile(old_profile, blob_store, user_settings)
-    blob_store.save_cache()
 
     try:
         load_profile_to_live(profile_name, blob_store, user_settings)
@@ -371,6 +366,5 @@ def overwrite_profile(
         backup_dir.rename(profile_dir)
         raise
     _rmtree(backup_dir)
-    blob_store.save_cache()
     profile_state.active_profile = profile_to_overwrite
     profile_state.save_config()

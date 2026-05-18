@@ -26,7 +26,7 @@ def scratch():
     )
     args = parser.parse_args()
 
-    blob_store = BlobStore.load_cache()
+    blob_store = BlobStore()
     files_to_restore = _list_files_to_restore(args.profile_name, blob_store)
     logger.info("Files to restore:")
     for file in files_to_restore:

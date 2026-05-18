@@ -4,7 +4,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from functions.profile_ops import save_live_to_profile
+from functions.blob_store import BlobStore
+from functions.profile_ops import save_live_to_profile, _list_files_to_restore
 
 
 class SaveLiveToProfileTests(unittest.TestCase):
@@ -84,6 +85,105 @@ class SaveLiveToProfileTests(unittest.TestCase):
                     str(live_file): "hash-store/file-entry",
                 },
             )
+
+
+class ListFilesToRestoreTests(unittest.TestCase):
+    def test_hash_mismatch_triggers_restore(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            store_dir = root / "store"
+            profiles_dir = root / "profiles"
+            profiles_dir.mkdir(parents=True)
+            store = BlobStore(store_dir=store_dir)
+
+            # Create the "correct" blob (v1 content)
+            blob_src = root / "v1.txt"
+            blob_src.write_text("v1 content", encoding="utf-8")
+            dest_rel, _ = store.store_file(blob_src)
+
+            # Create a live file with DIFFERENT content (v2)
+            live_file = root / "live.txt"
+            live_file.write_text("v2 content", encoding="utf-8")
+
+            # Build a v2 manifest referencing the v1 blob
+            manifest = {
+                "version": 2,
+                "targets": {str(live_file): str(dest_rel)},
+            }
+            profile_name = "test-profile"
+            manifest_file = profiles_dir / profile_name / "manifest.json"
+            manifest_file.parent.mkdir(parents=True, exist_ok=True)
+            manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with patch(
+                "functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir
+            ):
+                files_to_restore = _list_files_to_restore(profile_name, store)
+
+            self.assertEqual(len(files_to_restore), 1)
+            self.assertEqual(files_to_restore[0][0], live_file)
+
+    def test_hash_match_skips_restore(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            store_dir = root / "store"
+            profiles_dir = root / "profiles"
+            profiles_dir.mkdir(parents=True)
+            store = BlobStore(store_dir=store_dir)
+
+            # Create live file and store it
+            live_file = root / "live.txt"
+            live_file.write_text("same content", encoding="utf-8")
+            dest_rel, _ = store.store_file(live_file)
+
+            # Build manifest referencing the blob
+            manifest = {
+                "version": 2,
+                "targets": {str(live_file): str(dest_rel)},
+            }
+            profile_name = "test-profile"
+            manifest_file = profiles_dir / profile_name / "manifest.json"
+            manifest_file.parent.mkdir(parents=True, exist_ok=True)
+            manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with patch(
+                "functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir
+            ):
+                files_to_restore = _list_files_to_restore(profile_name, store)
+
+            self.assertEqual(len(files_to_restore), 0)
+
+    def test_missing_file_triggers_restore(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            store_dir = root / "store"
+            profiles_dir = root / "profiles"
+            profiles_dir.mkdir(parents=True)
+            store = BlobStore(store_dir=store_dir)
+
+            # Create a blob but no live file
+            blob_src = root / "blob.txt"
+            blob_src.write_text("content", encoding="utf-8")
+            dest_rel, _ = store.store_file(blob_src)
+
+            live_file = root / "missing.txt"
+
+            manifest = {
+                "version": 2,
+                "targets": {str(live_file): str(dest_rel)},
+            }
+            profile_name = "test-profile"
+            manifest_file = profiles_dir / profile_name / "manifest.json"
+            manifest_file.parent.mkdir(parents=True, exist_ok=True)
+            manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with patch(
+                "functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir
+            ):
+                files_to_restore = _list_files_to_restore(profile_name, store)
+
+            self.assertEqual(len(files_to_restore), 1)
+            self.assertEqual(files_to_restore[0][0], live_file)
 
 
 if __name__ == "__main__":
