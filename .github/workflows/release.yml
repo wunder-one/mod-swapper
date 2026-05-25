@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
       # 1. Check out code
@@ -50,7 +52,7 @@ jobs:
 
       # 6. Create a GitHub Release and upload the zip
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/mod-swapper-windows.zip
           generate_release_notes: true
