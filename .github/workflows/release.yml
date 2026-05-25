@@ -48,11 +48,11 @@ jobs:
       - name: Zip build output
         shell: pwsh
         run: |
-          Compress-Archive -Path dist\mod-swapper\* -DestinationPath dist\mod-swapper-windows.zip
+          Compress-Archive -Path dist\mod-swapper\* -DestinationPath dist\mod-swapper-${{ github.ref_name }}-windows.zip
 
       # 6. Create a GitHub Release and upload the zip
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/mod-swapper-windows.zip
+          files: dist/mod-swapper-${{ github.ref_name }}-windows.zip
           generate_release_notes: true
