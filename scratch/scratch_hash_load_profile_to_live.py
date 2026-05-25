@@ -9,32 +9,30 @@ import argparse
 import logging
 
 from config.logging_setup import configure_logging
-from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from functions.blob_store import BlobStore
-from functions.profile_ops import swap_profile
+from functions.profile_ops import load_profile_to_live
 
 logger = logging.getLogger(__name__)
 
 
 def scratch():
     parser = argparse.ArgumentParser(
-        description="Scratch: swap profiles (loads named profile to live mods).",
+        description="Scratch: load_profile_to_live — restore/remove files so live paths match the profile snapshot.",
     )
     parser.add_argument(
-        "profile_to_load",
+        "profile_name",
         type=str,
-        help="Profile folder name to activate",
+        help="Name of the profile folder under profiles snapshot dir",
     )
     args = parser.parse_args()
 
-    prof_state = ProfileState.load_config()
     user_settings = UserSettings.load_settings()
     blob_store = BlobStore.load_cache()
-    swap_profile(args.profile_to_load, prof_state, blob_store, user_settings)
-    blob_store.save_cache()
-    logger.info(
-        "Scratch swap finished; active profile is %r.", prof_state.active_profile
+    load_profile_to_live(
+        args.profile_name,
+        blob_store,
+        user_settings,
     )
 
 

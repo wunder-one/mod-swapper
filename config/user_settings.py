@@ -70,7 +70,7 @@ class UserSettings:
         ]
 
     @staticmethod
-    def _getcritical_game_paths(game_folder: Path | None) -> list[Path]:
+    def _get_critical_game_paths(game_folder: Path | None) -> list[Path]:
         result = []
         if not game_folder:
             return result
@@ -86,7 +86,7 @@ class UserSettings:
         self.game_folder = game_folder
         self.swap_paths = self._get_default_swap_paths(game_folder)
         self.user_protected_paths = self._get_default_protected_paths(game_folder)
-        self.critical_game_paths = self._getcritical_game_paths(game_folder)
+        self.critical_game_paths = self._get_critical_game_paths(game_folder)
         # Save to disk again
         self.save_settings()
 
@@ -99,7 +99,7 @@ class UserSettings:
             game_folder=game_folder,
             swap_paths=cls._get_default_swap_paths(game_folder),
             user_protected_paths=cls._get_default_protected_paths(game_folder),
-            critical_game_paths=cls._getcritical_game_paths(game_folder),
+            critical_game_paths=cls._get_critical_game_paths(game_folder),
         )
         settings.save_settings()
         return settings
@@ -150,7 +150,7 @@ class UserSettings:
                             )
 
             return cls(
-                critical_game_paths=cls._getcritical_game_paths(game_folder),
+                critical_game_paths=cls._get_critical_game_paths(game_folder),
                 **converted_data,
             )
 
@@ -182,5 +182,7 @@ class UserSettings:
             if protected_path.is_file():
                 excluded_files.append(protected_path)
             elif protected_path.is_dir():
+                excluded_dirs.append(protected_path)
+            else:
                 excluded_dirs.append(protected_path)
         return excluded_files, excluded_dirs

@@ -10,7 +10,8 @@ import customtkinter
 
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
-from functions.file_actions import overwrite_profile
+from functions.blob_store import BlobStore
+from functions.profile_ops import overwrite_profile
 from ui.wrapping_label import WrappingLabel
 
 if TYPE_CHECKING:
@@ -25,6 +26,7 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         master,
         prof_state: ProfileState,
         user_settings: UserSettings,
+        blob_store: BlobStore,
         *args,
         **kwargs,
     ):
@@ -32,6 +34,7 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         self._app: App = master
         self.prof_state = prof_state
         self.user_settings = user_settings
+        self.blob_store = blob_store
         self.transient(master)
         # transient() runs after CTk's initial title-bar setup; on Windows 10/11 that resets DWM
         # immersive dark mode for this HWND — re-run the same hook CTk uses in __init__ / resizable.
@@ -104,7 +107,9 @@ class OverwriteDialog(customtkinter.CTkToplevel):
 
         def worker():
             try:
-                overwrite_profile(profile, self.prof_state, self.user_settings)
+                overwrite_profile(
+                    profile, self.prof_state, self.blob_store, self.user_settings
+                )
             except ValueError as e:
                 logger.info("Profile overwrite skipped: %s", e)
             except Exception:
@@ -112,6 +117,7 @@ class OverwriteDialog(customtkinter.CTkToplevel):
 
             def on_done():
                 self._app.hide_progress_bar()
+                self._app.refresh_profiles()
                 logger.info("Profile %r overwritten.", profile)
 
             self._app.after(0, on_done)

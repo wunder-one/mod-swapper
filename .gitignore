@@ -1,6 +1,8 @@
+# Project specific and generic
 untracked/
 unused/
 previous_builds/
+logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -102,7 +104,7 @@ ipython_config.py
 #   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
-uv.lock
+#   uv.lock
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
@@ -198,14 +200,10 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Cursor
-#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
-#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
-#  refer to https://docs.cursor.com/context/ignore-files
+# IDE and agentspecific settings
+.cursor/
 .cursorignore
 .cursorindexingignore
-
-# Marimo
-marimo/_static/
-marimo/_lsp/
-__marimo__/
+.vscode/
+.claude/
+.codex/

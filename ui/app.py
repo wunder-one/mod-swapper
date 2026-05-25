@@ -10,17 +10,28 @@ from ui.overwrite_dialog import OverwriteDialog
 from ui.delete_dialog import DeleteDialog
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
-from functions.file_actions import swap_profiles, create_new_profile, delete_profile
-from ui.ui_fuctions import load_window_geometry, save_window_geometry
+from functions.blob_store import BlobStore
+from functions.profile_ops import (
+    swap_profile,
+    create_new_profile,
+    delete_profile,
+)
+from ui.ui_functions import load_window_geometry, save_window_geometry
 
 logger = logging.getLogger(__name__)
 
 
 class App(customtkinter.CTk):
-    def __init__(self, prof_state: ProfileState, user_settings: UserSettings):
+    def __init__(
+        self,
+        prof_state: ProfileState,
+        user_settings: UserSettings,
+        blob_store: BlobStore,
+    ):
         super().__init__()
         self.prof_state = prof_state
         self.user_settings = user_settings
+        self.blob_store = blob_store
         self.profile_list: list[str] = list(self.prof_state.profiles.keys())
         self.profile_frames: dict[str, ProfileFrame] = {}
 
@@ -118,7 +129,7 @@ class App(customtkinter.CTk):
     def open_overwrite_dialog(self):
         if self.overwrite_dialog is None or not self.overwrite_dialog.winfo_exists():
             self.overwrite_dialog = OverwriteDialog(
-                self, self.prof_state, self.user_settings
+                self, self.prof_state, self.user_settings, self.blob_store
             )
         else:
             self.overwrite_dialog.lift()
@@ -149,7 +160,10 @@ class App(customtkinter.CTk):
             set_name = None
             try:
                 set_name = create_new_profile(
-                    new_name.strip(), self.prof_state, self.user_settings
+                    new_name.strip(),
+                    self.prof_state,
+                    self.blob_store,
+                    self.user_settings,
                 )
             except ValueError as e:
                 logger.info("Profile creation skipped: %s", e)
@@ -191,7 +205,9 @@ class App(customtkinter.CTk):
 
         def worker():
             try:
-                swap_profiles(profile, self.prof_state, self.user_settings)
+                swap_profile(
+                    profile, self.prof_state, self.blob_store, self.user_settings
+                )
             except ValueError as e:
                 logger.info("Profile swap skipped: %s", e)
             except Exception:
