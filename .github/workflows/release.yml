@@ -1,0 +1,56 @@
+name: Build and Release
+
+# Triggers only when you push a tag starting with "v" (e.g. v0.2.0)
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # 1. Check out code
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # 2. Install uv
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+
+      # 3. Install dependencies (reads pyproject.toml and uv.lock)
+      - name: Install dependencies
+        run: uv sync
+
+      # 4. Find where uv installed customtkinter and build
+      #    We use PowerShell to locate the package path dynamically,
+      #    so we're never hardcoding C:\Users\wes\...
+      - name: Build with PyInstaller
+        shell: pwsh
+        run: |
+          $ctk_path = uv run python -c "import customtkinter, os; print(os.path.dirname(customtkinter.__file__))"
+          Write-Host "customtkinter found at: $ctk_path"
+          uv run pyinstaller `
+            --noconfirm `
+            --onedir `
+            --windowed `
+            --name "mod-swapper" `
+            --add-data "${ctk_path};customtkinter/" `
+            --add-data "ui\theme.json;ui" `
+            --add-data "assets;assets" `
+            --icon "assets\icons\magic_icon.ico" `
+            main.py
+
+      # 5. Zip the output folder so it's one file to download
+      - name: Zip build output
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\mod-swapper\* -DestinationPath dist\mod-swapper-windows.zip
+
+      # 6. Create a GitHub Release and upload the zip
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/mod-swapper-windows.zip
+          generate_release_notes: true
