@@ -13,7 +13,7 @@ The module is organized into several parts:
 import subprocess
 import xml.etree.ElementTree as ET
 import re
-from dataclasses import dataclass
+from config.mod_metadata import ModMetadata
 from pathlib import Path
 import tempfile
 
@@ -21,16 +21,6 @@ _HERE = Path(__file__).resolve().parent
 _PROJECT_ROOT = _HERE.parent
 DIVINE_EXE = _PROJECT_ROOT / "tools" / "lslib" / "Divine.exe"
 _META_LSX_PATTERN = re.compile(r"^Mods/([^/]+)/meta\.lsx", re.IGNORECASE)
-
-
-@dataclass
-class ModMetadata:
-    name: str
-    uuid: str
-    author: str
-    description: str
-    version: str
-    tags: set[str]
 
 
 def check_divine() -> None:
@@ -55,7 +45,7 @@ def _run_divine(*args: str) -> subprocess.CompletedProcess:
         [str(DIVINE_EXE), *args],
         capture_output=True,
         text=True,
-        encoding="utf-8",
+        encoding="utf-8", errors="replace",
     )
 
 
@@ -77,7 +67,7 @@ def _parse_meta_lsx(xml_string: str) -> ModMetadata:
         author=attr("Author"),
         description=attr("Description"),
         version=_decode_version64(int(attr("Version64"))),
-        tags=set(attr("Tags").split(";")),
+        tags=list(set(attr("Tags").split(";"))),
     )
 
 def _find_meta_lsx_path(pak_path: Path) -> str | None:
@@ -90,18 +80,22 @@ def _find_meta_lsx_path(pak_path: Path) -> str | None:
         raise RuntimeError(
             f"Divine.exe failed listing package (exit {result.returncode}):\n{result.stderr}"
         )
-    for line in result.stdout.splitlines():
+    stdout = result.stdout or ""
+    for line in stdout.splitlines():
         path = line.split()[0]
         if _META_LSX_PATTERN.match(path):
             return path
     return None
 
 
-def read_mod_metadata(pak_path: Path) -> ModMetadata:
-    """Read metadata from a BG3 mod package."""
-    meta_path = _find_meta_lsx_path(pak_path)
+def read_mod_metadata(pak_path: Path) -> ModMetadata | None:
+    """Read metadata from a BG3 mod package. Returns None if unavailable."""
+    try:
+        meta_path = _find_meta_lsx_path(pak_path)
+    except Exception:
+        return None
     if meta_path is None:
-        raise ValueError(f"No meta.lsx found in {pak_path.name}")
+        return None
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir) / "meta.lsx"
@@ -114,9 +108,8 @@ def read_mod_metadata(pak_path: Path) -> ModMetadata:
             "--destination", str(temp_path),
         )
         if result.returncode != 0:
-            raise RuntimeError(
-                f"Divine.exe failed extracting meta.lsx (exit {result.returncode}):\n"
-                f"stdout: {result.stdout}\n"
-                f"stderr: {result.stderr}"
-            )
-        return _parse_meta_lsx(temp_path.read_text(encoding="utf-8-sig"))
+            return None
+        try:
+            return _parse_meta_lsx(temp_path.read_text(encoding="utf-8-sig"))
+        except Exception:
+            return None
