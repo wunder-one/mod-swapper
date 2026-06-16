@@ -32,10 +32,10 @@ def check_divine() -> None:
 
 
 def _decode_version64(value: int) -> str:
-    major    = value >> 55
-    minor    = (value >> 47) & 0xFF
+    major = value >> 55
+    minor = (value >> 47) & 0xFF
     revision = (value >> 31) & 0xFFFF
-    build    = value & 0x7FFFFFFF
+    build = value & 0x7FFFFFFF
     return f"{major}.{minor}.{revision}.{build}"
 
 
@@ -45,7 +45,8 @@ def _run_divine(*args: str) -> subprocess.CompletedProcess:
         [str(DIVINE_EXE), *args],
         capture_output=True,
         text=True,
-        encoding="utf-8", errors="replace",
+        encoding="utf-8",
+        errors="replace",
     )
 
 
@@ -67,14 +68,19 @@ def _parse_meta_lsx(xml_string: str) -> ModMetadata:
         author=attr("Author"),
         description=attr("Description"),
         version=_decode_version64(int(attr("Version64"))),
+        version64=int(attr("Version64")),
         tags=list(set(attr("Tags").split(";"))),
     )
 
+
 def _find_meta_lsx_path(pak_path: Path) -> str | None:
     result = _run_divine(
-        "--game", "bg3",
-        "--action", "list-package",
-        "--source", str(pak_path),
+        "--game",
+        "bg3",
+        "--action",
+        "list-package",
+        "--source",
+        str(pak_path),
     )
     if result.returncode != 0:
         raise RuntimeError(
@@ -101,11 +107,16 @@ def read_mod_metadata(pak_path: Path) -> ModMetadata | None:
         temp_path = Path(temp_dir) / "meta.lsx"
 
         result = _run_divine(
-            "--game", "bg3",
-            "--action", "extract-single-file",
-            "--source", str(pak_path),
-            "--packaged-path", meta_path,
-            "--destination", str(temp_path),
+            "--game",
+            "bg3",
+            "--action",
+            "extract-single-file",
+            "--source",
+            str(pak_path),
+            "--packaged-path",
+            meta_path,
+            "--destination",
+            str(temp_path),
         )
         if result.returncode != 0:
             return None

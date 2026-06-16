@@ -25,7 +25,7 @@ for pak in paks:
 
     if meta is None:
         failed += 1
-        print(f"{pak.name:60s} {size//1024:>8}KB  divine=FAIL (no metadata)")
+        print(f"{pak.name:60s} {size // 1024:>8}KB  divine=FAIL (no metadata)")
         continue
 
     t2 = time.perf_counter()
@@ -34,7 +34,9 @@ for pak in paks:
 
     faster = "divine" if divine_time < hash_time else "hash"
     results.append((size, divine_time, hash_time, faster, pak.name))
-    print(f"{pak.name:60s} {size//1024:>8}KB  divine={divine_time:.3f}s  hash={hash_time:.3f}s  [{faster}]")
+    print(
+        f"{pak.name:60s} {size // 1024:>8}KB  divine={divine_time:.3f}s  hash={hash_time:.3f}s  [{faster}]"
+    )
 
 print()
 print(f"=== Summary ({len(results)}/{total} succeeded, {failed} failed) ===")
@@ -42,11 +44,15 @@ print(f"=== Summary ({len(results)}/{total} succeeded, {failed} failed) ===")
 print()
 print("=== Speed by file size ===")
 results.sort(key=lambda r: r[0])
-for label, cond in [("Divine faster", lambda r: r[3] == "divine"),
-                     ("Hash faster",  lambda r: r[3] == "hash")]:
+for label, cond in [
+    ("Divine faster", lambda r: r[3] == "divine"),
+    ("Hash faster", lambda r: r[3] == "hash"),
+]:
     subset = [r for r in results if cond(r)]
     if subset:
         sizes = [r[0] for r in subset]
-        print(f"  {label}: {len(subset)} files, sizes {min(sizes)//1024}KB – {max(sizes)//1024}KB")
+        print(
+            f"  {label}: {len(subset)} files, sizes {min(sizes) // 1024}KB – {max(sizes) // 1024}KB"
+        )
     else:
         print(f"  {label}: none")
