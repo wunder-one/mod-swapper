@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 from functions.profile_ops import save_live_to_profile, _list_files_to_restore
 
 

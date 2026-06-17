@@ -10,7 +10,7 @@ from ui.overwrite_dialog import OverwriteDialog
 from ui.delete_dialog import DeleteDialog
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 from functions.profile_ops import (
     swap_profile,
     create_new_profile,

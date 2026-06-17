@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from constants import PROFILES_SNAPSHOT_DIR
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 from ui.migration_progress import MigrationProgress
 
 logger = logging.getLogger(__name__)

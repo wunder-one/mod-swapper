@@ -10,7 +10,7 @@ import customtkinter
 
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 from functions.profile_ops import overwrite_profile
 from ui.wrapping_label import WrappingLabel
 

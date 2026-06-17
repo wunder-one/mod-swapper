@@ -10,7 +10,7 @@ import logging
 
 from config.logging_setup import configure_logging
 from config.user_settings import UserSettings
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 from functions.profile_ops import load_profile_to_live
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ from typing import Any, TypedDict
 from config import mod_metadata
 import functions.manifest as manifest_ops
 from config.user_settings import UserSettings
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 from config.profile_state import ProfileState
 from functions.profile_ops import save_live_to_profile
 from config.manifest import Manifest, ManifestEntry
