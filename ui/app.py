@@ -6,6 +6,7 @@ import threading
 import customtkinter
 
 from ui.settings import SettingsWindow
+from ui.update_dialog import UpdateDialog
 from ui.overwrite_dialog import OverwriteDialog
 from ui.delete_dialog import DeleteDialog
 from config.profile_state import ProfileState
@@ -68,6 +69,7 @@ class App(customtkinter.CTk):
         self.settings_window: SettingsWindow | None = None
         self.overwrite_dialog: OverwriteDialog | None = None
         self.delete_dialog: DeleteDialog | None = None
+        self.update_dialog: UpdateDialog | None = None
 
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -125,6 +127,14 @@ class App(customtkinter.CTk):
             window.bind("<Map>", lambda event: window.focus())
         else:
             self.settings_window.focus()
+
+    def open_update_dialog(self):
+        if self.update_dialog is None or not self.update_dialog.winfo_exists():
+            window = UpdateDialog(self, self.prof_state, self.user_settings, self.blob_store)
+            self.update_dialog = window
+            window.bind("<Map>", lambda event: window.focus())
+        else:
+            self.update_dialog.focus()
 
     def open_overwrite_dialog(self):
         if self.overwrite_dialog is None or not self.overwrite_dialog.winfo_exists():
@@ -292,6 +302,11 @@ class ButtonBar(customtkinter.CTkFrame):
             self, text="Delete Profile", command=self._app.open_delete_dialog, width=100
         )
         self.delete_button.grid(row=0, column=2, padx=(6, 0), pady=6)
+
+        self.update_button = customtkinter.CTkButton(
+            self, text="Update Mods", command=self._app.open_update_dialog, width=100
+        )
+        self.update_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
 
         self.settings_button = customtkinter.CTkButton(
             self, text="Settings", command=self._app.open_settings_window, width=100
