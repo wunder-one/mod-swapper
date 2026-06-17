@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 import json
+from collections.abc import Callable
 from typing import Any, TypedDict
 
 from config import mod_metadata
@@ -99,19 +100,49 @@ def _check_mod_for_update(
     return None
 
 
-
+def _collect_pak_files(
+    user_settings: UserSettings,
+    excluded_files: set[Path],
+    excluded_dirs: set[Path],
+) -> list[Path]:
+    pak_files: list[Path] = []
+    for swap_path in user_settings.get_swap_paths():
+        if not swap_path.is_dir():
+            continue
+        for root, _, files in swap_path.walk():
+            for file in files:
+                file_path = root / file
+                if _is_excluded(file_path, excluded_files, excluded_dirs):
+                    continue
+                if file_path.is_file() and file_path.suffix == ".pak":
+                    pak_files.append(file_path)
+    return pak_files
 
 
 def list_updates(
-    profile_state: ProfileState, blob_store: BlobStore, user_settings: UserSettings
+    profile_state: ProfileState,
+    blob_store: BlobStore,
+    user_settings: UserSettings,
+    on_progress: Callable[..., None] | None = None,
 ) -> list[Update]:
     """
     List all updates for the current profile.
     """
+    def report(
+        message: str,
+        *,
+        progress: float | None = None,
+        update: Update | None = None,
+    ) -> None:
+        if on_progress is not None:
+            on_progress(message, progress=progress, update=update)
+
     logger.info(f"Saving active profile to snapshot: {profile_state.active_profile}")
+    report("Saving profile snapshot...", progress=0.0)
     save_live_to_profile(profile_state.active_profile, blob_store, user_settings)
     updates: list[Update] = []
 
+    report("Loading manifests...", progress=0.05)
     logger.debug("Loading global manifest")
     global_manifest = manifest_ops.load()
     logger.debug("Loading profile manifest")
@@ -123,21 +154,35 @@ def list_updates(
 
     logger.debug("Getting excluded files and directories")
     excluded_files, excluded_dirs = user_settings.get_all_protected_paths()
-    logger.debug("Getting swap paths")
-    for swap_path in user_settings.get_swap_paths():
-        if swap_path.is_dir():
-            for root, _, files in swap_path.walk():
-                for file in files:
-                    file_path = root / file
-                    if _is_excluded(file_path, set(excluded_files), set(excluded_dirs)):
-                        continue
-                    if file_path.is_file() and file_path.suffix == ".pak":
-                        update_info = _check_mod_for_update(
-                            file_path, global_manifest, profile_manifest
-                        )
-                        if update_info:
-                            updates.append(update_info)
-                            logger.info(f"Update found for {file_path}: {update_info['update_hash']}")
-                        else:
-                            logger.info(f"No update found for {file_path}")
+    pak_files = _collect_pak_files(
+        user_settings, set(excluded_files), set(excluded_dirs)
+    )
+    total_paks = len(pak_files)
+
+    if total_paks == 0:
+        report("No mod files to check.", progress=1.0)
+        return updates
+
+    report(f"Scanning {total_paks} mod file(s)...", progress=0.1)
+    for index, file_path in enumerate(pak_files, start=1):
+        progress = 0.1 + (0.9 * index / total_paks)
+        report(f"Checking {file_path.name}...", progress=progress)
+        update_info = _check_mod_for_update(
+            file_path, global_manifest, profile_manifest
+        )
+        if update_info:
+            updates.append(update_info)
+            logger.info(
+                f"Update found for {file_path}: {update_info['update_hash']}"
+            )
+            report(
+                f"Update found: {update_info['mod_name']} "
+                f"({update_info['prev_version']} -> {update_info['new_version']})",
+                progress=progress,
+                update=update_info,
+            )
+        else:
+            logger.info(f"No update found for {file_path}")
+
+    report(f"Done — {len(updates)} update(s) found.", progress=1.0)
     return updates
