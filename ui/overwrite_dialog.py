@@ -102,13 +102,18 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         logger.info("Overwriting profile: %s", profile)
 
         self.destroy()
-        self._app.show_progress_bar()
+        self._app.begin_save_progress()
         self._app.update_idletasks()
+        on_file = self._app.make_store_file_callback()
 
         def worker():
             try:
                 overwrite_profile(
-                    profile, self.prof_state, self.blob_store, self.user_settings
+                    profile,
+                    self.prof_state,
+                    self.blob_store,
+                    self.user_settings,
+                    on_file=on_file,
                 )
             except ValueError as e:
                 logger.info("Profile overwrite skipped: %s", e)

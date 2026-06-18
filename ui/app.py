@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from pathlib import Path
 
 import customtkinter
 
@@ -13,13 +14,19 @@ from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from storage.blob_store import BlobStore
 from functions.profile_ops import (
-    swap_profile,
+    OnStoreFile,
+    chain_store_file_callbacks,
     create_new_profile,
     delete_profile,
+    swap_profile,
 )
 from ui.ui_functions import load_window_geometry, save_window_geometry
 
 logger = logging.getLogger(__name__)
+
+
+def _store_file_progress(index: int, total: int) -> float:
+    return index / total if total else 1.0
 
 
 class App(customtkinter.CTk):
@@ -79,9 +86,32 @@ class App(customtkinter.CTk):
         self.progress_bar.grid()
         self.progress_bar.start()
 
+    def begin_save_progress(self) -> None:
+        self.progress_bar.stop()
+        self.progress_bar.configure(mode="determinate")
+        self.progress_bar.set(0)
+        self.progress_bar.grid()
+
+    def report_save_progress(self, progress: float) -> None:
+        self.progress_bar.set(progress)
+
     def hide_progress_bar(self) -> None:
         self.progress_bar.stop()
+        self.progress_bar.configure(mode="indeterminate")
         self.progress_bar.grid_remove()
+
+    def make_store_file_callback(self) -> OnStoreFile:
+        def on_file(
+            file_path: Path, index: int, total: int, copied_to_store: bool
+        ) -> None:
+            progress = _store_file_progress(index, total)
+
+            def apply() -> None:
+                self.report_save_progress(progress)
+
+            self.after(0, apply)
+
+        return on_file
 
     def draw_profile_frames(self):
         self.profile_list = list(self.prof_state.profiles.keys())
@@ -163,8 +193,9 @@ class App(customtkinter.CTk):
         if new_name is None or new_name.strip() == "":
             logger.info("New profile dialog cancelled or empty name.")
             return
-        self.show_progress_bar()
+        self.begin_save_progress()
         self.update_idletasks()
+        on_file = self.make_store_file_callback()
 
         def worker():
             set_name = None
@@ -174,6 +205,7 @@ class App(customtkinter.CTk):
                     self.prof_state,
                     self.blob_store,
                     self.user_settings,
+                    on_file=on_file,
                 )
             except ValueError as e:
                 logger.info("Profile creation skipped: %s", e)
@@ -210,13 +242,18 @@ class App(customtkinter.CTk):
         threading.Thread(target=worker, daemon=True).start()
 
     def activate_profile_callback(self, profile: str):
-        self.show_progress_bar()
+        self.begin_save_progress()
         self.update_idletasks()
+        on_file = self.make_store_file_callback()
 
         def worker():
             try:
                 swap_profile(
-                    profile, self.prof_state, self.blob_store, self.user_settings
+                    profile,
+                    self.prof_state,
+                    self.blob_store,
+                    self.user_settings,
+                    on_file=on_file,
                 )
             except ValueError as e:
                 logger.info("Profile swap skipped: %s", e)

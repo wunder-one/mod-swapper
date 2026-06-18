@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import customtkinter
@@ -10,6 +11,7 @@ from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from storage.blob_store import BlobStore
 from functions.update_mods import list_updates, Update
+from functions.profile_ops import OnStoreFile, chain_store_file_callbacks
 
 if TYPE_CHECKING:
     from ui.app import App
@@ -91,6 +93,16 @@ class UpdateDialog(customtkinter.CTkToplevel):
 
         self.after(0, apply)
 
+    def _make_store_file_callback(self) -> OnStoreFile:
+        def on_file(
+            file_path: Path, index: int, total: int, copied_to_store: bool
+        ) -> None:
+            progress = (index / total) * 0.05 if total else 0.05
+            verb = "Copying" if copied_to_store else "Storing"
+            self._report_progress(f"{verb} {file_path.name}...", progress=progress)
+
+        return on_file
+
     def _on_scan_complete(self, updates: list[Update], *, failed: bool = False) -> None:
         if not self.winfo_exists():
             return
@@ -109,22 +121,29 @@ class UpdateDialog(customtkinter.CTkToplevel):
 
     def _start_update_scan(self) -> None:
         self.update_idletasks()
+        on_file = chain_store_file_callbacks(
+            self._make_store_file_callback(),
+            self._app.make_store_file_callback(),
+        )
 
         def worker() -> None:
             updates: list[Update] = []
             failed = False
+            self._app.after(0, self._app.begin_save_progress)
             try:
                 updates = list_updates(
                     self.prof_state,
                     self.blob_store,
                     self.user_settings,
                     on_progress=self._report_progress,
+                    on_file=on_file,
                 )
             except Exception:
                 logger.exception("Update scan failed.")
                 failed = True
 
             def on_done() -> None:
+                self._app.hide_progress_bar()
                 self._on_scan_complete(updates, failed=failed)
 
             self.after(0, on_done)

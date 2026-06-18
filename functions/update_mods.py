@@ -9,7 +9,7 @@ import functions.manifest as manifest_ops
 from config.user_settings import UserSettings
 from storage.blob_store import BlobStore
 from config.profile_state import ProfileState
-from functions.profile_ops import save_live_to_profile
+from functions.profile_ops import OnStoreFile, save_live_to_profile
 from config.manifest import Manifest, ManifestEntry
 from constants import PROFILES_SNAPSHOT_DIR
 
@@ -124,6 +124,7 @@ def list_updates(
     blob_store: BlobStore,
     user_settings: UserSettings,
     on_progress: Callable[..., None] | None = None,
+    on_file: OnStoreFile | None = None,
 ) -> list[Update]:
     """
     List all updates for the current profile.
@@ -139,7 +140,12 @@ def list_updates(
 
     logger.info(f"Saving active profile to snapshot: {profile_state.active_profile}")
     report("Saving profile snapshot...", progress=0.0)
-    save_live_to_profile(profile_state.active_profile, blob_store, user_settings)
+    save_live_to_profile(
+        profile_state.active_profile,
+        blob_store,
+        user_settings,
+        on_file=on_file,
+    )
     updates: list[Update] = []
 
     report("Loading manifests...", progress=0.05)

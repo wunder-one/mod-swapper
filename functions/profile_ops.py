@@ -11,6 +11,20 @@ from functions.file_actions import get_unique_path
 
 logger = logging.getLogger(__name__)
 
+OnStoreFile = Callable[[Path, int, int, bool], None]
+# args: file_path, index (1-based), total_files, copied_to_store
+
+
+def chain_store_file_callbacks(*callbacks: OnStoreFile | None) -> OnStoreFile:
+    def combined(
+        file_path: Path, index: int, total: int, copied_to_store: bool
+    ) -> None:
+        for callback in callbacks:
+            if callback is not None:
+                callback(file_path, index, total, copied_to_store)
+
+    return combined
+
 
 def _is_excluded(
     file_path: Path,
@@ -25,12 +39,41 @@ def _is_excluded(
     return False
 
 
+def _count_files_to_store(
+    swap_paths: list[Path],
+    excluded_files: list[Path],
+    excluded_dirs: list[Path],
+) -> int:
+    excluded_files_set = set(excluded_files)
+    excluded_dirs_set = set(excluded_dirs)
+    total = 0
+    for live_path in swap_paths:
+        if not live_path.exists():
+            continue
+        if live_path.is_file():
+            if not _is_excluded(live_path, excluded_files_set, excluded_dirs_set):
+                total += 1
+        elif live_path.is_dir():
+            for root, _, files in live_path.walk():
+                for filename in files:
+                    file_path = root / filename
+                    if not _is_excluded(
+                        file_path, excluded_files_set, excluded_dirs_set
+                    ):
+                        total += 1
+    return total
+
+
 def store_directory(
     source_dir: Path,
     blob_store: BlobStore,
     excluded_files: list[Path] | None = None,
     excluded_dirs: list[Path] | None = None,
-) -> dict[str, str]:
+    on_file: OnStoreFile | None = None,
+    *,
+    file_index: int = 0,
+    total_files: int = 0,
+) -> tuple[dict[str, str], int]:
     logger.debug("Storing directory: %s", source_dir)
     if excluded_files is None:
         excluded_files = list[Path]()
@@ -61,6 +104,9 @@ def store_directory(
                 copied_files_count += 1
             else:
                 skipped_files_count += 1
+            file_index += 1
+            if on_file is not None:
+                on_file(file_path, file_index, total_files, copied_to_store)
             # add file to manifest
             manifest_additions[str(file_path)] = str(dest_rel)
     logger.info(
@@ -73,7 +119,7 @@ def store_directory(
         skipped_files_count,
         excluded_files_count,
     )
-    return manifest_additions
+    return manifest_additions, file_index
 
 
 def store_file(
@@ -81,44 +127,62 @@ def store_file(
     blob_store: BlobStore,
     excluded_files: list[Path] | None = None,
     excluded_dirs: list[Path] | None = None,
-) -> dict[str, str]:
+    on_file: OnStoreFile | None = None,
+    *,
+    file_index: int = 0,
+    total_files: int = 0,
+) -> tuple[dict[str, str], int]:
     if excluded_files is None:
         excluded_files = list[Path]()
     if excluded_dirs is None:
         excluded_dirs = list[Path]()
     if _is_excluded(source_path, set(excluded_files), set(excluded_dirs)):
-        return {}
+        return {}, file_index
     dest_rel, copied_to_store = blob_store.store_file(source_path)
     if copied_to_store:
         logger.info("Copied file %s to store", source_path)
     else:
         logger.info("File %s already in store", source_path)
-    return {str(source_path): str(dest_rel)}
+    file_index += 1
+    if on_file is not None:
+        on_file(source_path, file_index, total_files, copied_to_store)
+    return {str(source_path): str(dest_rel)}, file_index
 
 
 def save_live_to_profile(
     profile_name: str,
     blob_store: BlobStore,
     user_settings: UserSettings,
+    on_file: OnStoreFile | None = None,
 ):
     excluded_files, excluded_dirs = user_settings.get_all_protected_paths()
+    total_files = _count_files_to_store(
+        user_settings.swap_paths, excluded_files, excluded_dirs
+    )
+    file_index = 0
     manifest = {"version": 2, "targets": {}}
     for live_path in user_settings.swap_paths:
         if live_path.exists():
             manifest_additions = {}
             if live_path.is_dir():
-                manifest_additions = store_directory(
+                manifest_additions, file_index = store_directory(
                     live_path,
                     blob_store,
                     excluded_files=excluded_files,
                     excluded_dirs=excluded_dirs,
+                    on_file=on_file,
+                    file_index=file_index,
+                    total_files=total_files,
                 )
             if live_path.is_file():
-                manifest_additions = store_file(
+                manifest_additions, file_index = store_file(
                     live_path,
                     blob_store,
                     excluded_files=excluded_files,
                     excluded_dirs=excluded_dirs,
+                    on_file=on_file,
+                    file_index=file_index,
+                    total_files=total_files,
                 )
             manifest["targets"].update(manifest_additions)
         else:
@@ -261,13 +325,18 @@ def swap_profile(
     profile_state: ProfileState,
     blob_store: BlobStore,
     user_settings: UserSettings,
+    on_file: OnStoreFile | None = None,
 ):
     old_profile = profile_state.active_profile
     backup_profile = None
     if not old_profile:
         logger.info("No active profile; creating backup from current live mods.")
         backup_profile = create_new_profile(
-            "Backup Profile", profile_state, blob_store, user_settings
+            "Backup Profile",
+            profile_state,
+            blob_store,
+            user_settings,
+            on_file=on_file,
         )
         old_profile = backup_profile
     else:
@@ -276,7 +345,9 @@ def swap_profile(
             old_profile,
             profile_name,
         )
-        save_live_to_profile(old_profile, blob_store, user_settings)
+        save_live_to_profile(
+            old_profile, blob_store, user_settings, on_file=on_file
+        )
     blob_store.save_cache()
 
     try:
@@ -313,11 +384,14 @@ def create_new_profile(
     blob_store: BlobStore,
     user_settings: UserSettings,
     refresh_profiles: Callable[[], None] | None = None,
+    on_file: OnStoreFile | None = None,
 ) -> str:
     unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
     unique_dir.mkdir(parents=True, exist_ok=False)
     profile_name = unique_dir.name
-    save_live_to_profile(profile_name, blob_store, user_settings)
+    save_live_to_profile(
+        profile_name, blob_store, user_settings, on_file=on_file
+    )
     profile_state.active_profile = profile_name
     profile_state.save_config()
     if refresh_profiles is not None:
@@ -351,6 +425,7 @@ def overwrite_profile(
     profile_state: ProfileState,
     blob_store: BlobStore,
     user_settings: UserSettings,
+    on_file: OnStoreFile | None = None,
 ):
     profile_dir = PROFILES_SNAPSHOT_DIR / profile_to_overwrite
     if not profile_dir.exists():
@@ -359,7 +434,9 @@ def overwrite_profile(
     backup_dir = PROFILES_SNAPSHOT_DIR / f"{profile_to_overwrite}.tmp-rollback"
     profile_dir.rename(backup_dir)
     try:
-        save_live_to_profile(profile_to_overwrite, blob_store, user_settings)
+        save_live_to_profile(
+            profile_to_overwrite, blob_store, user_settings, on_file=on_file
+        )
     except Exception:
         if (PROFILES_SNAPSHOT_DIR / profile_to_overwrite).exists():
             _rmtree(PROFILES_SNAPSHOT_DIR / profile_to_overwrite)

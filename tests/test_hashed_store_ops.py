@@ -43,11 +43,11 @@ class SaveLiveToProfileTests(unittest.TestCase):
                 ),
                 patch(
                     "functions.profile_ops.store_directory",
-                    return_value=dir_manifest,
+                    return_value=(dir_manifest, 0),
                 ) as store_directory_mock,
                 patch(
                     "functions.profile_ops.store_file",
-                    return_value=file_manifest,
+                    return_value=(file_manifest, 1),
                 ) as store_file_mock,
                 patch("functions.profile_ops.logger.warning") as warning_mock,
             ):
@@ -62,12 +62,18 @@ class SaveLiveToProfileTests(unittest.TestCase):
                 blob_store,
                 excluded_files=excluded_files,
                 excluded_dirs=excluded_dirs,
+                on_file=None,
+                file_index=0,
+                total_files=1,
             )
             store_file_mock.assert_called_once_with(
                 live_file,
                 blob_store,
                 excluded_files=excluded_files,
                 excluded_dirs=excluded_dirs,
+                on_file=None,
+                file_index=0,
+                total_files=1,
             )
             warning_mock.assert_called_once_with(
                 "Live path does not exist: %s", missing_path
