@@ -42,6 +42,7 @@ class App(customtkinter.CTk):
         self.blob_store = blob_store
         self.profile_list: list[str] = list(self.prof_state.profiles.keys())
         self.profile_frames: dict[str, ProfileFrame] = {}
+        self._busy = False
 
         self.title("BG3 Profile Swapper")
         no_of_rows = (len(self.profile_list) - 1) // 3 + 1
@@ -100,6 +101,19 @@ class App(customtkinter.CTk):
         self.progress_bar.configure(mode="indeterminate")
         self.progress_bar.grid_remove()
 
+    def set_busy(self, busy: bool) -> None:
+        self._busy = busy
+        bar_state = "disabled" if busy else "normal"
+        for btn in (
+            self.button_bar.new_profile_button,
+            self.button_bar.overwrite_button,
+            self.button_bar.delete_button,
+            self.button_bar.update_button,
+            self.button_bar.settings_button,
+        ):
+            btn.configure(state=bar_state)
+        self.update_profile_frames()
+
     def make_store_file_callback(self) -> OnStoreFile:
         def on_file(
             file_path: Path, index: int, total: int, copied_to_store: bool
@@ -132,7 +146,12 @@ class App(customtkinter.CTk):
     def update_profile_frames(self):
         for frame_title in self.profile_frames:
             frame = self.profile_frames[frame_title]
-            frame.set_active_appearance(frame.profile == self.prof_state.active_profile)
+            if self._busy:
+                frame.activate_button.configure(state="disabled")
+            else:
+                frame.set_active_appearance(
+                    frame.profile == self.prof_state.active_profile
+                )
 
     def get_child_window_location(
         self, child_width: int, child_height: int
@@ -151,6 +170,8 @@ class App(customtkinter.CTk):
         self.draw_profile_frames()
 
     def open_settings_window(self):
+        if self._busy:
+            return
         if self.settings_window is None or not self.settings_window.winfo_exists():
             window = SettingsWindow(self, self.user_settings)
             self.settings_window = window
@@ -159,6 +180,8 @@ class App(customtkinter.CTk):
             self.settings_window.focus()
 
     def open_update_dialog(self):
+        if self._busy:
+            return
         if self.update_dialog is None or not self.update_dialog.winfo_exists():
             window = UpdateDialog(self, self.prof_state, self.user_settings, self.blob_store)
             self.update_dialog = window
@@ -167,6 +190,8 @@ class App(customtkinter.CTk):
             self.update_dialog.focus()
 
     def open_overwrite_dialog(self):
+        if self._busy:
+            return
         if self.overwrite_dialog is None or not self.overwrite_dialog.winfo_exists():
             self.overwrite_dialog = OverwriteDialog(
                 self, self.prof_state, self.user_settings, self.blob_store
@@ -176,6 +201,8 @@ class App(customtkinter.CTk):
             self.overwrite_dialog.focus_set()
 
     def open_delete_dialog(self):
+        if self._busy:
+            return
         if self.delete_dialog is None or not self.delete_dialog.winfo_exists():
             self.delete_dialog = DeleteDialog(self, self.prof_state)
         else:
@@ -183,6 +210,8 @@ class App(customtkinter.CTk):
             self.delete_dialog.focus_set()
 
     def new_profile_callback(self):
+        if self._busy:
+            return
         win_x, win_y = self.get_child_window_location(340, 230)
         new_profile_dialog = customtkinter.CTkInputDialog(
             text="This will create a new profile from your currently active mods.\n\nProfile Name:",
@@ -193,6 +222,7 @@ class App(customtkinter.CTk):
         if new_name is None or new_name.strip() == "":
             logger.info("New profile dialog cancelled or empty name.")
             return
+        self.set_busy(True)
         self.begin_save_progress()
         self.update_idletasks()
         on_file = self.make_store_file_callback()
@@ -217,12 +247,16 @@ class App(customtkinter.CTk):
                 if set_name is not None:
                     logger.info("Created profile %r.", set_name)
                 self.hide_progress_bar()
+                self.set_busy(False)
 
             self.after(0, on_done)
 
         threading.Thread(target=worker, daemon=True).start()
 
     def delete_profile_async(self, profile: str):
+        if self._busy:
+            return
+        self.set_busy(True)
         self.show_progress_bar()
         self.update_idletasks()
 
@@ -236,12 +270,16 @@ class App(customtkinter.CTk):
             def on_done():
                 self.refresh_profiles()
                 self.hide_progress_bar()
+                self.set_busy(False)
 
             self.after(0, on_done)
 
         threading.Thread(target=worker, daemon=True).start()
 
     def activate_profile_callback(self, profile: str):
+        if self._busy:
+            return
+        self.set_busy(True)
         self.begin_save_progress()
         self.update_idletasks()
         on_file = self.make_store_file_callback()
@@ -264,12 +302,15 @@ class App(customtkinter.CTk):
                 # Full redraw so a swap-created backup profile appears in the grid (Tk: main thread only).
                 self.refresh_profiles()
                 self.hide_progress_bar()
+                self.set_busy(False)
 
             self.after(0, on_done)
 
         threading.Thread(target=worker, daemon=True).start()
 
     def on_close(self):
+        if self._busy:
+            return
         save_window_geometry("app", winfo_x=self.winfo_x(), winfo_y=self.winfo_y())
         self.quit()
 

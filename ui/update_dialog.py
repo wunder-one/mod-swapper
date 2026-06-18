@@ -120,6 +120,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.status_progressbar.set(1.0)
 
     def _start_update_scan(self) -> None:
+        self._app.set_busy(True)
         self.update_idletasks()
         on_file = chain_store_file_callbacks(
             self._make_store_file_callback(),
@@ -144,6 +145,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
 
             def on_done() -> None:
                 self._app.hide_progress_bar()
+                self._app.set_busy(False)
                 self._on_scan_complete(updates, failed=failed)
 
             self.after(0, on_done)

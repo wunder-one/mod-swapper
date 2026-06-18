@@ -102,6 +102,7 @@ class OverwriteDialog(customtkinter.CTkToplevel):
         logger.info("Overwriting profile: %s", profile)
 
         self.destroy()
+        self._app.set_busy(True)
         self._app.begin_save_progress()
         self._app.update_idletasks()
         on_file = self._app.make_store_file_callback()
@@ -123,6 +124,7 @@ class OverwriteDialog(customtkinter.CTkToplevel):
             def on_done():
                 self._app.hide_progress_bar()
                 self._app.refresh_profiles()
+                self._app.set_busy(False)
                 logger.info("Profile %r overwritten.", profile)
 
             self._app.after(0, on_done)
