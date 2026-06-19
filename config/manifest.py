@@ -3,6 +3,7 @@ from config.mod_metadata import ModMetadata
 
 
 class ManifestEntry(TypedDict):
+    filename: str | None
     size: int
     mod_metadata: ModMetadata | None
 

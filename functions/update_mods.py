@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class Update(TypedDict):
-    target_path: Path
+    current_path: Path
+    target_filename: str | None
     update_hash: str
-    update_path: Path
+    update_storage_path: Path
     prev_version64: int
     prev_version: str
     new_version64: int
@@ -65,8 +66,9 @@ def _check_mod_for_update(
                     newest_so_far = entry_hash
         if newest_so_far != live_hash:
             update_hash = newest_so_far
-            update_path = Path(update_hash[:2]) / Path(update_hash[2:])
+            update_storage_path = Path(update_hash[:2]) / Path(update_hash[2:])
             update_entry = global_manifest["entries"][update_hash]
+            update_filename = update_entry.get("filename")
             update_mod_metadata = update_entry.get("mod_metadata")
             if update_mod_metadata:
                 mod_name = update_mod_metadata.get("name")
@@ -86,9 +88,10 @@ def _check_mod_for_update(
                 new_version = ""
                 logger.error(f"Mod metadata not found for {mod_path}")
             return Update(
-                target_path=mod_path,
+                current_path=mod_path,
+                target_filename=update_filename,
                 update_hash=update_hash,
-                update_path=update_path,
+                update_storage_path=update_storage_path,
                 prev_version64=prev_version64,
                 prev_version=prev_version,
                 new_version64=new_version64,
@@ -150,7 +153,7 @@ def list_updates(
 
     report("Loading manifests...", progress=0.05)
     logger.debug("Loading global manifest")
-    global_manifest = manifest_ops.load()
+    global_manifest = manifest_ops.load_global_manifest()
     logger.debug("Loading profile manifest")
     profile_manifest_file = (
         PROFILES_SNAPSHOT_DIR / profile_state.active_profile / "manifest.json"
@@ -192,3 +195,31 @@ def list_updates(
 
     report(f"Done — {len(updates)} update(s) found.", progress=1.0)
     return updates
+
+
+def copy_updates(
+    updates: list[Update],
+    user_settings: UserSettings,
+    on_progress: Callable[..., None] | None = None,
+    on_file: OnStoreFile | None = None,
+) -> None:
+    """
+    Copy the updates to the profile.
+    """
+    for update in updates:
+        # get current path, target name, and storage path
+        current_path = update["current_path"]
+        target_name = update["target_filename"] or current_path.name
+        target_path = current_path.parent / target_name
+        storage_path = update["update_storage_path"]
+
+        # atomically copy storage path to target path
+        tmp_path = target_path.parent / f"{target_name}.tmp-update"
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        storage_path.copy(tmp_path, follow_symlinks=False, preserve_metadata=True)
+        tmp_path.replace(target_path)
+
+        # if current path is not target path, delete current path (if the update has a different name)
+        if target_path != current_path:
+            current_path.unlink(missing_ok=True)
+

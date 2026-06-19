@@ -10,7 +10,7 @@ import customtkinter
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from storage.blob_store import BlobStore
-from functions.update_mods import list_updates, Update
+from functions.update_mods import list_updates, Update, copy_updates
 from functions.profile_ops import OnStoreFile, chain_store_file_callbacks
 
 if TYPE_CHECKING:
@@ -66,6 +66,10 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.update_list = customtkinter.CTkTextbox(self)
         self.update_list.grid(row=2, column=0, padx=20, pady=(10, 20), sticky="nsew")
         self.update_list.configure(state="disabled")
+
+        self.button_bar = ButtonBar(self, self._app)
+        self.button_bar.grid(row=3, column=0, padx=0, pady=(10, 0), sticky="ew")
+        self.button_bar.configure(corner_radius=0)
 
         self._start_update_scan()
 
@@ -151,3 +155,41 @@ class UpdateDialog(customtkinter.CTkToplevel):
             self.after(0, on_done)
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _start_update_file_copy(self) -> None:
+        self._app.set_busy(True)
+        self.update_idletasks()
+        on_file = chain_store_file_callbacks(
+            self._make_store_file_callback(),
+            self._app.make_store_file_callback(),
+        )
+        self._app.after(0, self._app.begin_save_progress)
+        def worker() -> None:
+            copy_updates()
+            # TODO: Implement update file copy
+            pass
+
+            def on_done() -> None:
+                self._app.hide_progress_bar()
+                self._app.set_busy(False)
+                self._on_update_file_copy_complete()
+
+            self.after(0, on_done)
+
+class ButtonBar(customtkinter.CTkFrame):
+    def __init__(self, master: customtkinter.CTkToplevel, app: App) -> None:
+        super().__init__(master)
+        self._master: customtkinter.CTkToplevel = master
+        self._app: App = app
+        self.grid_columnconfigure(3, weight=1)
+
+
+        self.update_button = customtkinter.CTkButton(
+            self, text="Cancel", command=self._master.destroy, width=100
+        )
+        self.update_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
+
+        self.settings_button = customtkinter.CTkButton(
+            self, text="Update Mods", command=self._start_update_file_copy, width=100
+        )
+        self.settings_button.grid(row=0, column=4, padx=(0, 6), pady=6, sticky="e")
