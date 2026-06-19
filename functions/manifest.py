@@ -42,8 +42,15 @@ def save(manifest: Manifest) -> None:
         json.dump(manifest, f, indent=4)
 
 
-def add_entry(hash: str, entry: ManifestEntry, manifest: Manifest) -> None:
-    manifest["entries"][hash] = entry
+def add_manifest_entry(hash: str, source_path: Path, size: int) -> None:
+    mod_metadata = read_mod_metadata(source_path)
+    manifest = load_global_manifest()
+    manifest["entries"][hash] = {
+        "filename": source_path.name,
+        "size": size,
+        "mod_metadata": mod_metadata if mod_metadata else None,
+    }
+    save(manifest)
 
 
 def update_manifest() -> Manifest:
@@ -83,7 +90,7 @@ def update_manifest() -> Manifest:
             "mod_metadata": mod_metadata if mod_metadata else None,
         }
 
-        add_entry(hash, manifest_entry, manifest)
+        manifest["entries"][hash] = manifest_entry
 
     if processed == 0:
         print("Manifest is already up to date.")
