@@ -70,6 +70,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.button_bar = ButtonBar(self, self._app)
         self.button_bar.grid(row=3, column=0, padx=0, pady=(10, 0), sticky="ew")
         self.button_bar.configure(corner_radius=0)
+        self.button_bar.update_button.configure(state="disabled")
 
         self._start_update_scan()
 
@@ -113,15 +114,23 @@ class UpdateDialog(customtkinter.CTkToplevel):
         if failed:
             self.status_label.configure(text="Update scan failed.")
             self.status_progressbar.set(0)
+            self.button_bar.update_button.configure(state="disabled")
             return
 
         self._updates = updates
         count = len(updates)
         if count == 0:
             self.status_label.configure(text="No updates found.")
+            self.button_bar.update_button.configure(state="disabled")
         else:
-            self.status_label.configure(text=f"Found {count} update(s).")
+            self.status_label.configure(text=f"Found {count} update(s). Ready to update.")
+            self.button_bar.update_button.configure(state="normal")
         self.status_progressbar.set(1.0)
+
+    def _on_update_clicked(self) -> None:
+        if not self._updates:
+            return
+        self._start_update_file_copy(self._updates)
 
     def _start_update_scan(self) -> None:
         self._app.set_busy(True)
@@ -131,7 +140,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
             self._app.make_store_file_callback(),
         )
 
-        def worker() -> None:
+        def scan_worker() -> list[Update] | None:
             updates: list[Update] = []
             failed = False
             self._app.after(0, self._app.begin_save_progress)
@@ -146,6 +155,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
             except Exception:
                 logger.exception("Update scan failed.")
                 failed = True
+                return None
 
             def on_done() -> None:
                 self._app.hide_progress_bar()
@@ -153,43 +163,63 @@ class UpdateDialog(customtkinter.CTkToplevel):
                 self._on_scan_complete(updates, failed=failed)
 
             self.after(0, on_done)
+            return updates
 
-        threading.Thread(target=worker, daemon=True).start()
+        threading.Thread(target=scan_worker, daemon=True).start()
 
-    def _start_update_file_copy(self) -> None:
+    def _start_update_file_copy(self, updates: list[Update]) -> None:
         self._app.set_busy(True)
+        self.button_bar.update_button.configure(state="disabled")
+        self.button_bar.cancel_button.configure(state="disabled")
         self.update_idletasks()
-        on_file = chain_store_file_callbacks(
-            self._make_store_file_callback(),
-            self._app.make_store_file_callback(),
-        )
-        self._app.after(0, self._app.begin_save_progress)
-        def worker() -> None:
-            copy_updates()
-            # TODO: Implement update file copy
-            pass
+
+        def copy_worker() -> None:
+            failed = False
+            self._app.after(0, self._app.begin_save_progress)
+            try:
+                copy_updates(
+                    updates,
+                    self.blob_store,
+                    on_progress=self._report_progress,
+                )
+            except Exception:
+                logger.exception("Update copy failed.")
+                failed = True
 
             def on_done() -> None:
                 self._app.hide_progress_bar()
                 self._app.set_busy(False)
-                self._on_update_file_copy_complete()
+                if not self.winfo_exists():
+                    return
+                self.button_bar.cancel_button.configure(state="normal")
+                if failed:
+                    self.status_label.configure(text="Update failed.")
+                    self.button_bar.update_button.configure(state="normal")
+                else:
+                    self.status_label.configure(text=f"Updated {len(updates)} mod(s).")
+                    self._updates = []
 
             self.after(0, on_done)
 
+        threading.Thread(target=copy_worker, daemon=True).start()
+
 class ButtonBar(customtkinter.CTkFrame):
-    def __init__(self, master: customtkinter.CTkToplevel, app: App) -> None:
+    def __init__(self, master: UpdateDialog, app: App) -> None:
         super().__init__(master)
-        self._master: customtkinter.CTkToplevel = master
+        self._master: UpdateDialog = master
         self._app: App = app
         self.grid_columnconfigure(3, weight=1)
 
 
-        self.update_button = customtkinter.CTkButton(
+        self.cancel_button = customtkinter.CTkButton(
             self, text="Cancel", command=self._master.destroy, width=100
         )
-        self.update_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
+        self.cancel_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
 
-        self.settings_button = customtkinter.CTkButton(
-            self, text="Update Mods", command=self._start_update_file_copy, width=100
+        self.update_button = customtkinter.CTkButton(
+            self,
+            text="Update Mods",
+            command=self._master._on_update_clicked,
+            width=100,
         )
-        self.settings_button.grid(row=0, column=4, padx=(0, 6), pady=6, sticky="e")
+        self.update_button.grid(row=0, column=4, padx=(0, 6), pady=6, sticky="e")

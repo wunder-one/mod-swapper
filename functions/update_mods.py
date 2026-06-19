@@ -199,27 +199,39 @@ def list_updates(
 
 def copy_updates(
     updates: list[Update],
-    user_settings: UserSettings,
+    blob_store: BlobStore,
     on_progress: Callable[..., None] | None = None,
-    on_file: OnStoreFile | None = None,
 ) -> None:
     """
-    Copy the updates to the profile.
+    Copy the updates to live mod paths.
     """
-    for update in updates:
-        # get current path, target name, and storage path
+    total = len(updates)
+
+    def report(message: str, *, progress: float | None = None) -> None:
+        if on_progress is not None:
+            on_progress(message, progress=progress)
+
+    for index, update in enumerate(updates, start=1):
         current_path = update["current_path"]
         target_name = update["target_filename"] or current_path.name
         target_path = current_path.parent / target_name
-        storage_path = update["update_storage_path"]
+        storage_path = blob_store.store_dir / update["update_storage_path"]
 
-        # atomically copy storage path to target path
+        if not storage_path.exists():
+            raise FileNotFoundError(
+                f"Update blob missing for {current_path}: {storage_path}"
+            )
+
+        progress = index / total if total else 1.0
+        report(f"Updating {target_name}...", progress=progress)
+
         tmp_path = target_path.parent / f"{target_name}.tmp-update"
         target_path.parent.mkdir(parents=True, exist_ok=True)
         storage_path.copy(tmp_path, follow_symlinks=False, preserve_metadata=True)
         tmp_path.replace(target_path)
 
-        # if current path is not target path, delete current path (if the update has a different name)
         if target_path != current_path:
             current_path.unlink(missing_ok=True)
+
+    report("Done.", progress=1.0)
 
