@@ -35,6 +35,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.blob_store = blob_store
         self.user_settings = user_settings
         self._updates: list[Update] = []
+        self._dialog_busy = False
 
         self.title("Updating Mods")
         win_width = 500
@@ -72,7 +73,26 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.button_bar.configure(corner_radius=0)
         self.button_bar.update_button.configure(state="disabled")
 
+        self.protocol("WM_DELETE_WINDOW", self._on_close_requested)
         self._start_update_scan()
+
+    def _set_buttons_busy(self, busy: bool) -> None:
+        state = "disabled" if busy else "normal"
+        self.button_bar.cancel_button.configure(state=state)
+        self.button_bar.update_button.configure(state=state)
+
+    def _show_done_button(self) -> None:
+        self.button_bar.cancel_button.configure(state="disabled")
+        self.button_bar.update_button.configure(
+            text="Done",
+            command=self.destroy,
+            state="normal",
+        )
+
+    def _on_close_requested(self) -> None:
+        if self._dialog_busy:
+            return
+        self.destroy()
 
     def _report_progress(
         self,
@@ -168,9 +188,9 @@ class UpdateDialog(customtkinter.CTkToplevel):
         threading.Thread(target=scan_worker, daemon=True).start()
 
     def _start_update_file_copy(self, updates: list[Update]) -> None:
+        self._dialog_busy = True
         self._app.set_busy(True)
-        self.button_bar.update_button.configure(state="disabled")
-        self.button_bar.cancel_button.configure(state="disabled")
+        self._set_buttons_busy(True)
         self.update_idletasks()
 
         def copy_worker() -> None:
@@ -187,21 +207,23 @@ class UpdateDialog(customtkinter.CTkToplevel):
                 failed = True
 
             def on_done() -> None:
+                self._dialog_busy = False
                 self._app.hide_progress_bar()
                 self._app.set_busy(False)
                 if not self.winfo_exists():
                     return
-                self.button_bar.cancel_button.configure(state="normal")
                 if failed:
                     self.status_label.configure(text="Update failed.")
-                    self.button_bar.update_button.configure(state="normal")
+                    self._set_buttons_busy(False)
                 else:
                     self.status_label.configure(text=f"Updated {len(updates)} mod(s).")
                     self._updates = []
+                    self._show_done_button()
 
             self.after(0, on_done)
 
         threading.Thread(target=copy_worker, daemon=True).start()
+
 
 class ButtonBar(customtkinter.CTkFrame):
     def __init__(self, master: UpdateDialog, app: App) -> None:
@@ -209,7 +231,6 @@ class ButtonBar(customtkinter.CTkFrame):
         self._master: UpdateDialog = master
         self._app: App = app
         self.grid_columnconfigure(3, weight=1)
-
 
         self.cancel_button = customtkinter.CTkButton(
             self, text="Cancel", command=self._master.destroy, width=100
