@@ -93,6 +93,12 @@ class App(customtkinter.CTk):
         self.progress_bar.set(0)
         self.progress_bar.grid()
 
+    def begin_indeterminate_progress(self) -> None:
+        self.progress_bar.stop()
+        self.progress_bar.configure(mode="indeterminate")
+        self.progress_bar.grid()
+        self.progress_bar.start()
+
     def report_save_progress(self, progress: float) -> None:
         self.progress_bar.set(progress)
 
@@ -284,6 +290,9 @@ class App(customtkinter.CTk):
         self.update_idletasks()
         on_file = self.make_store_file_callback()
 
+        def on_load_start() -> None:
+            self.after(0, self.begin_indeterminate_progress)
+
         def worker():
             try:
                 swap_profile(
@@ -292,6 +301,7 @@ class App(customtkinter.CTk):
                     self.blob_store,
                     self.user_settings,
                     on_file=on_file,
+                    on_load_start=on_load_start,
                 )
             except ValueError as e:
                 logger.info("Profile swap skipped: %s", e)

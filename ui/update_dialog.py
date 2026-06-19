@@ -55,14 +55,19 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.status_frame.grid_columnconfigure(0, weight=1)
         self.status_frame.grid_rowconfigure(0, weight=1)
 
-        self.status_label = customtkinter.CTkLabel(
-            self.status_frame, text="Starting scan..."
+        self.phase_label = customtkinter.CTkLabel(
+            self.status_frame, text="Step 1 of 2: Scanning for updates...", anchor="w", justify="left"
         )
-        self.status_label.grid(row=0, column=0, padx=20, pady=(0, 0), sticky="w")
+        self.phase_label.grid(row=0, column=0, padx=20, pady=(0, 0), sticky="w")
 
         self.status_progressbar = customtkinter.CTkProgressBar(self.status_frame)
-        self.status_progressbar.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="ew")
+        self.status_progressbar.grid(row=1, column=0, padx=20, pady=(0, 0), sticky="ew")
         self.status_progressbar.set(0)
+
+        self.status_label = customtkinter.CTkLabel(
+            self.status_frame, text="Starting scan...", anchor="w", justify="left"
+        )
+        self.status_label.grid(row=3, column=0, padx=20, pady=(6, 0), sticky="w")
 
         self.update_list = customtkinter.CTkTextbox(self)
         self.update_list.grid(row=2, column=0, padx=20, pady=(10, 20), sticky="nsew")
@@ -93,6 +98,14 @@ class UpdateDialog(customtkinter.CTkToplevel):
         if self._dialog_busy:
             return
         self.destroy()
+
+    def _set_phase(self, text: str) -> None:
+        def apply() -> None:
+            if not self.winfo_exists():
+                return
+            self.phase_label.configure(text=text)
+
+        self.after(0, apply)
 
     def _report_progress(
         self,
@@ -132,6 +145,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
         if not self.winfo_exists():
             return
         if failed:
+            self._set_phase("Step 1 of 2: Scan failed")
             self.status_label.configure(text="Update scan failed.")
             self.status_progressbar.set(0)
             self.button_bar.update_button.configure(state="disabled")
@@ -140,9 +154,11 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self._updates = updates
         count = len(updates)
         if count == 0:
+            self._set_phase("Step 1 of 2: Complete — no updates found")
             self.status_label.configure(text="No updates found.")
-            self.button_bar.update_button.configure(state="disabled")
+            self._show_done_button()
         else:
+            self._set_phase("Step 1 of 2: Complete — review updates below")
             self.status_label.configure(text=f"Found {count} update(s). Ready to update.")
             self.button_bar.update_button.configure(state="normal")
         self.status_progressbar.set(1.0)
@@ -153,6 +169,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self._start_update_file_copy(self._updates)
 
     def _start_update_scan(self) -> None:
+        self._set_phase("Step 1 of 2: Saving current profile and scanning for updates...")
         self._app.set_busy(True)
         self.update_idletasks()
         on_file = chain_store_file_callbacks(
@@ -188,6 +205,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
         threading.Thread(target=scan_worker, daemon=True).start()
 
     def _start_update_file_copy(self, updates: list[Update]) -> None:
+        self._set_phase("Step 2 of 2: Applying updates...")
         self._dialog_busy = True
         self._app.set_busy(True)
         self._set_buttons_busy(True)
@@ -213,9 +231,11 @@ class UpdateDialog(customtkinter.CTkToplevel):
                 if not self.winfo_exists():
                     return
                 if failed:
+                    self._set_phase("Step 2 of 2: Update failed")
                     self.status_label.configure(text="Update failed.")
                     self._set_buttons_busy(False)
                 else:
+                    self._set_phase("Step 2 of 2: Complete")
                     self.status_label.configure(text=f"Updated {len(updates)} mod(s).")
                     self._updates = []
                     self._show_done_button()

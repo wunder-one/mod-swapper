@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 OnStoreFile = Callable[[Path, int, int, bool], None]
 # args: file_path, index (1-based), total_files, copied_to_store
 
+OnLoadStart = Callable[[], None]
+
 
 def chain_store_file_callbacks(*callbacks: OnStoreFile | None) -> OnStoreFile:
     def combined(
@@ -293,6 +295,7 @@ def load_profile_to_live(
     profile_name: str,
     blob_store: BlobStore,
     user_settings: UserSettings,
+    on_load_start: OnLoadStart | None = None,
 ):
     # get files to restore and remove
     files_to_restore = _list_files_to_restore(profile_name, blob_store)
@@ -303,6 +306,8 @@ def load_profile_to_live(
         excluded_files=excluded_files,
         excluded_dirs=excluded_dirs,
     )
+    if on_load_start is not None:
+        on_load_start()
     # restore files from list of files to restore
     for live_path, storage_path in files_to_restore:
         if not storage_path.exists():
@@ -326,6 +331,7 @@ def swap_profile(
     blob_store: BlobStore,
     user_settings: UserSettings,
     on_file: OnStoreFile | None = None,
+    on_load_start: OnLoadStart | None = None,
 ):
     old_profile = profile_state.active_profile
     backup_profile = None
@@ -351,7 +357,9 @@ def swap_profile(
     blob_store.save_cache()
 
     try:
-        load_profile_to_live(profile_name, blob_store, user_settings)
+        load_profile_to_live(
+            profile_name, blob_store, user_settings, on_load_start=on_load_start
+        )
         profile_state.active_profile = profile_name
         profile_state.save_config()
         logger.info("Swap complete; active profile is now %r.", profile_name)
