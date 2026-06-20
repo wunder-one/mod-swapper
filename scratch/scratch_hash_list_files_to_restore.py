@@ -9,7 +9,7 @@ import argparse
 import logging
 
 from config.logging_setup import configure_logging
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 from functions.profile_ops import _list_files_to_restore
 
 logger = logging.getLogger(__name__)

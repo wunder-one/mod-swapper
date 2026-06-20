@@ -1,3 +1,8 @@
+"""
+This is a legacy module that has been replaced by the profile_ops module.
+It is kept here for backwards compatibility.
+"""
+
 import json
 import logging
 import subprocess

@@ -11,7 +11,7 @@ import logging
 from config.logging_setup import configure_logging
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 from functions.profile_ops import swap_profile
 
 logger = logging.getLogger(__name__)

@@ -7,7 +7,7 @@ import ui.migration_progress
 from config.logging_setup import configure_logging
 from config.profile_state import ProfileState
 from config.user_settings import UserSettings
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 from functions.migrate import migrate_file_store, MigrationCancelledError
 from config.migration_state import MigrationState
 from customtkinter import set_default_color_theme

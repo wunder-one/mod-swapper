@@ -3,7 +3,7 @@ import time
 import unittest
 from pathlib import Path
 
-from functions.blob_store import BlobStore
+from storage.blob_store import BlobStore
 
 
 class BlobStoreCacheTests(unittest.TestCase):

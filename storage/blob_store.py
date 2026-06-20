@@ -112,6 +112,7 @@ class BlobStore:
         if not dest.exists():
             raise RuntimeError("Failed to store file %s", source_path)
         logger.debug("Stored file %s as %s", source_path, dest_rel)
+        logger.debug("Added file %s to manifest", source_path)
         return dest_rel, True
 
     def has_blob(self, file_hash: str) -> bool:
