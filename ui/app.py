@@ -120,9 +120,7 @@ class App(customtkinter.CTk):
         self.update_profile_frames()
 
     def make_store_file_callback(self) -> OnStoreFile:
-        def on_file(
-            file_path: Path, index: int, total: int, copied_to_store: bool
-        ) -> None:
+        def on_file(file_path: Path, index: int, total: int) -> None:
             progress = _store_file_progress(index, total)
 
             def apply() -> None:

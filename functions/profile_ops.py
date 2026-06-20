@@ -17,19 +17,17 @@ from functions.manifest import (
 
 logger = logging.getLogger(__name__)
 
-OnStoreFile = Callable[[Path, int, int, bool], None]
-# args: file_path, index (1-based), total_files, copied_to_store
+OnStoreFile = Callable[[Path, int, int], None]
+# args: file_path, index (1-based), total_files
 
 OnLoadStart = Callable[[], None]
 
 
 def chain_store_file_callbacks(*callbacks: OnStoreFile | None) -> OnStoreFile:
-    def combined(
-        file_path: Path, index: int, total: int, copied_to_store: bool
-    ) -> None:
+    def combined(file_path: Path, index: int, total: int) -> None:
         for callback in callbacks:
             if callback is not None:
-                callback(file_path, index, total, copied_to_store)
+                callback(file_path, index, total)
 
     return combined
 
@@ -134,7 +132,7 @@ def store_directory(
                 skipped_files_count += 1
             file_index += 1
             if on_file is not None:
-                on_file(file_path, file_index, total_files, copied_to_store)
+                on_file(file_path, file_index, total_files)
             # add file to manifest
             profile_manifest_additions[str(file_path)] = str(dest_rel)
             global_manifest = add_global_manifest_entry(
@@ -200,7 +198,7 @@ def store_file(
         logger.info("File %s already in store", source_path)
     file_index += 1
     if on_file is not None:
-        on_file(source_path, file_index, total_files, copied_to_store)
+        on_file(source_path, file_index, total_files)
     return {str(source_path): str(dest_rel)}, file_index, global_manifest
 
 

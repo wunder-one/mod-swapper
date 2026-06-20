@@ -142,7 +142,7 @@ def list_updates(
             on_progress(message, progress=progress, update=update)
 
     logger.info(f"Saving active profile to snapshot: {profile_state.active_profile}")
-    report("Saving profile snapshot...", progress=0.0)
+    report("Saving current mods to profile...", progress=0.0)
     save_live_to_profile(
         profile_state.active_profile,
         blob_store,
@@ -151,7 +151,7 @@ def list_updates(
     )
     updates: list[Update] = []
 
-    report("Loading manifests...", progress=0.05)
+    report("Preparing update scan...", progress=0.05)
     logger.debug("Loading global manifest")
     global_manifest = manifest_ops.load_global_manifest()
     logger.debug("Loading profile manifest")
