@@ -41,12 +41,16 @@ def _decode_version64(value: int) -> str:
 
 def _run_divine(*args: str) -> subprocess.CompletedProcess:
     check_divine()
+    run_kw: dict = {}
+    if hasattr(subprocess, "CREATE_NO_WINDOW"):
+        run_kw["creationflags"] = subprocess.CREATE_NO_WINDOW
     return subprocess.run(
         [str(DIVINE_EXE), *args],
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
+        **run_kw,
     )
 
 

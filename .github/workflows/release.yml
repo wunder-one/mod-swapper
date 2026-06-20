@@ -41,6 +41,7 @@ jobs:
             --add-data "${ctk_path};customtkinter/" `
             --add-data "ui\theme.json;ui" `
             --add-data "assets;assets" `
+            --add-data "tools;tools" `
             --icon "assets\icons\magic_icon.ico" `
             main.py
 
