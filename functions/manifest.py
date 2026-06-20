@@ -50,14 +50,15 @@ def add_global_manifest_entry(
     source_path: Path, 
     size: int | None = None,
 ) -> Manifest:
-    mod_metadata = read_mod_metadata(source_path)
-    if size is None:
-        size = source_path.stat().st_size
-    global_manifest["entries"][hash] = {
-        "filename": source_path.name,
-        "size": size,
-        "mod_metadata": mod_metadata if mod_metadata else None,
-    }
+    if hash not in global_manifest["entries"]:
+        mod_metadata = read_mod_metadata(source_path)
+        if size is None:
+            size = source_path.stat().st_size
+        global_manifest["entries"][hash] = {
+            "filename": source_path.name,
+            "size": size,
+            "mod_metadata": mod_metadata if mod_metadata else None,
+        }
     return global_manifest
 
 
