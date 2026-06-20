@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import customtkinter
@@ -11,7 +10,7 @@ from config.profile_state import ProfileState
 from config.user_settings import UserSettings
 from storage.blob_store import BlobStore
 from functions.update_mods import list_updates, Update, copy_updates
-from functions.profile_ops import OnStoreFile, chain_store_file_callbacks
+from functions.update_progress import UpdateScanProgress
 from functions.manifest import update_manifest, UpdateCancelled
 
 if TYPE_CHECKING:
@@ -40,6 +39,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self._committed = False
         self._cancel_event = threading.Event()
         self._worker_running = False
+        self._scan_progress = UpdateScanProgress()
 
         self.title("Updating Mods")
         win_width = 500
@@ -159,13 +159,6 @@ class UpdateDialog(customtkinter.CTkToplevel):
 
         self.after(0, apply)
 
-    def _make_store_file_callback(self) -> OnStoreFile:
-        def on_file(file_path: Path, index: int, total: int) -> None:
-            progress = (index / total) * 0.05 if total else 0.05
-            self._report_progress(f"Saving {file_path.name}...", progress=progress)
-
-        return on_file
-
     def _finish_worker(self) -> None:
         self._app.hide_progress_bar()
         self._app.set_busy(False)
@@ -200,6 +193,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
                 text=f"Found {count} update(s). Ready to update."
             )
             self.button_bar.update_button.configure(state="normal")
+            self.button_bar.cancel_button.configure(state="normal")
         self.status_progressbar.set(1.0)
         self._finish_worker()
 
@@ -212,7 +206,10 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self._set_phase(
             "Step 1 of 2: Saving current profile and scanning for updates..."
         )
-        self._report_progress("Saving current mods to profile...", progress=0.0)
+        self._report_progress(
+            "Saving current mods to profile...",
+            progress=self._scan_progress.save[0],
+        )
         self._app.begin_save_progress()
 
     def _start_update_scan(self) -> None:
@@ -220,13 +217,15 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self._report_progress("Scanning mods for version information...", progress=0.0)
         self._app.set_busy(True)
         self.update_idletasks()
-        on_file = chain_store_file_callbacks(
-            self._make_store_file_callback(),
-            self._app.make_store_file_callback(),
-        )
+        on_file = self._app.make_store_file_callback()
 
         def manifest_progress(message: str, *, progress: float) -> None:
-            self._report_progress(message, progress=progress)
+            self._report_progress(
+                message,
+                progress=self._scan_progress.in_phase(
+                    self._scan_progress.manifest, progress
+                ),
+            )
 
         def scan_worker() -> list[Update] | None:
             self._worker_running = True
@@ -246,6 +245,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
                     self.user_settings,
                     on_progress=self._report_progress,
                     on_file=on_file,
+                    scan_progress=self._scan_progress,
                 )
             except UpdateCancelled:
                 cancelled = True

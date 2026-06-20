@@ -9,6 +9,7 @@ from config.user_settings import UserSettings
 from storage.blob_store import BlobStore
 from config.profile_state import ProfileState
 from functions.profile_ops import OnStoreFile, save_live_to_profile
+from functions.update_progress import DEFAULT_UPDATE_SCAN_PROGRESS, UpdateScanProgress
 from config.manifest import Manifest
 from constants import PROFILES_SNAPSHOT_DIR
 
@@ -130,6 +131,7 @@ def list_updates(
     user_settings: UserSettings,
     on_progress: Callable[..., None] | None = None,
     on_file: OnStoreFile | None = None,
+    scan_progress: UpdateScanProgress = DEFAULT_UPDATE_SCAN_PROGRESS,
 ) -> list[Update]:
     """
     List all updates for the current profile.
@@ -144,17 +146,25 @@ def list_updates(
         if on_progress is not None:
             on_progress(message, progress=progress, update=update)
 
+    def report_save(file_path: Path, index: int, total: int) -> None:
+        report(
+            f"Saving {file_path.name}...",
+            progress=scan_progress.save_at(index, total),
+        )
+        if on_file is not None:
+            on_file(file_path, index, total)
+
     logger.info(f"Saving active profile to snapshot: {profile_state.active_profile}")
-    report("Saving current mods to profile...", progress=0.0)
+    report("Saving current mods to profile...", progress=scan_progress.save[0])
     save_live_to_profile(
         profile_state.active_profile,
         blob_store,
         user_settings,
-        on_file=on_file,
+        on_file=report_save,
     )
     updates: list[Update] = []
 
-    report("Preparing update scan...", progress=0.05)
+    report("Preparing update scan...", progress=scan_progress.prep)
     logger.debug("Loading global manifest")
     global_manifest = manifest_ops.load_global_manifest()
     logger.debug("Loading profile manifest")
@@ -172,12 +182,12 @@ def list_updates(
     total_paks = len(pak_files)
 
     if total_paks == 0:
-        report("No mod files to check.", progress=1.0)
+        report("No mod files to check.", progress=scan_progress.scan[1])
         return updates
 
-    report(f"Scanning {total_paks} mod file(s)...", progress=0.1)
+    report(f"Scanning {total_paks} mod file(s)...", progress=scan_progress.scan[0])
     for index, file_path in enumerate(pak_files, start=1):
-        progress = 0.1 + (0.9 * index / total_paks)
+        progress = scan_progress.scan_at(index, total_paks)
         report(f"Checking {file_path.name}...", progress=progress)
         update_info = _check_mod_for_update(
             file_path, global_manifest, profile_manifest
@@ -194,7 +204,7 @@ def list_updates(
         else:
             logger.info(f"No update found for {file_path}")
 
-    report(f"Done — {len(updates)} update(s) found.", progress=1.0)
+    report(f"Done — {len(updates)} update(s) found.", progress=scan_progress.scan[1])
     return updates
 
 

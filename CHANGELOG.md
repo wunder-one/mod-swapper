@@ -1,5 +1,14 @@
 # Changelog
 
+## [v0.3.2] - 2026-06-20
+
+Improves Update Mods progress reporting and developer test tooling.
+
+- Fix: Issue where cancel button was not avaiable when list of updates is shown
+- Centralizes update-scan progress bar ranges in `UpdateScanProgress` for easier progress bar adjustments
+- Adjusted progress bar status percents
+- Migrates the test suite from unittest to pytest (`uv run pytest`)
+
 ## [v0.3.1] - 2026-06-20
 
 Fixed a bug that can sometimes cause the wrong version to be selected when checking for mod updates.
