@@ -61,7 +61,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
 
         self.phase_label = customtkinter.CTkLabel(
             self.status_frame,
-            text="Preparing: Updating manifest...",
+            text="Preparing: Scanning mods for version information...",
             anchor="w",
             justify="left",
         )
@@ -72,7 +72,10 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.status_progressbar.set(0)
 
         self.status_label = customtkinter.CTkLabel(
-            self.status_frame, text="Updating manifest...", anchor="w", justify="left"
+            self.status_frame,
+            text="Preparing: Scanning mods for version information...",
+            anchor="w",
+            justify="left",
         )
         self.status_label.grid(row=3, column=0, padx=20, pady=(6, 0), sticky="w")
 
@@ -157,12 +160,9 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.after(0, apply)
 
     def _make_store_file_callback(self) -> OnStoreFile:
-        def on_file(
-            file_path: Path, index: int, total: int, copied_to_store: bool
-        ) -> None:
+        def on_file(file_path: Path, index: int, total: int) -> None:
             progress = (index / total) * 0.05 if total else 0.05
-            verb = "Copying" if copied_to_store else "Storing"
-            self._report_progress(f"{verb} {file_path.name}...", progress=progress)
+            self._report_progress(f"Saving {file_path.name}...", progress=progress)
 
         return on_file
 
@@ -212,12 +212,12 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self._set_phase(
             "Step 1 of 2: Saving current profile and scanning for updates..."
         )
-        self._report_progress("Saving profile snapshot...", progress=0.0)
+        self._report_progress("Saving current mods to profile...", progress=0.0)
         self._app.begin_save_progress()
 
     def _start_update_scan(self) -> None:
-        self._set_phase("Preparing: Updating manifest...")
-        self._report_progress("Updating manifest...", progress=0.0)
+        self._set_phase("Preparing: Scanning mods for version information...")
+        self._report_progress("Scanning mods for version information...", progress=0.0)
         self._app.set_busy(True)
         self.update_idletasks()
         on_file = chain_store_file_callbacks(

@@ -99,7 +99,7 @@ def update_manifest(
     filename_hash_dict = create_filename_hash_dict()
 
     if total == 0:
-        report("Manifest is already up to date.", progress=1.0)
+        report("Mod version records are up to date.", progress=1.0)
         check_cancelled()
         commit_and_save()
         return manifest
@@ -115,15 +115,15 @@ def update_manifest(
                 mod_name = mod_metadata.get("name")
             else:
                 mod_name = file.parent.name + file.name
-            report(f"Checking {mod_name}...", progress=progress)
+            report(f"Scanning {mod_name}...", progress=progress)
         else:
             filename = filename_hash_dict.get(hash)
             mod_metadata = read_mod_metadata(file)
             if mod_metadata:
                 mod_name = mod_metadata.get("name")
-                report(f"Adding {mod_name}...", progress=progress)
+                report(f"Scanning {mod_name}...", progress=progress)
             else:
-                report(f"Adding {filename}...", progress=progress)
+                report(f"Scanning {filename}...", progress=progress)
 
             manifest_entry: ManifestEntry = {
                 "filename": filename,
