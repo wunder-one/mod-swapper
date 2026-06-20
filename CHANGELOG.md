@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.3.1] - 2026-06-20
+
+Fixed a bug that can sometimes cause the wrong version to be selected when checking for mod updates.
+
+- Adds tests/test_update_mods.py with 18 tests covering update detection (_check_mod_for_update), pak file scanning (_is_excluded, _collect_pak_files), and update application (copy_updates)
+- Fixes _check_mod_for_update to select the highest version64 when multiple stored versions of the same mod exist; previously it compared each candidate only against the live version, so manifest iteration order could pick an older update over a newer one
+
 ## [v0.3.0] - 2026-06-20
 
 Adds mod version tracking and an update workflow so profiles can pick up newer versions of mods already stored in the blob store.
