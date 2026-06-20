@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 from config.manifest import Manifest, ManifestEntry
 from functions.divine import read_mod_metadata
@@ -62,7 +63,13 @@ def add_global_manifest_entry(
     return global_manifest
 
 
-def update_manifest() -> Manifest:
+def update_manifest(
+    on_progress: Callable[..., None] | None = None,
+) -> Manifest:
+    def report(message: str, *, progress: float) -> None:
+        if on_progress is not None:
+            on_progress(message, progress=progress)
+
     manifest = load_global_manifest()
 
     all_files = [
@@ -74,33 +81,39 @@ def update_manifest() -> Manifest:
     ]
     total = len(all_files)
     filename_hash_dict = create_filename_hash_dict()
-    processed = 0
 
-    for i, file in enumerate(all_files, 1):
+    if total == 0:
+        report("Manifest is already up to date.", progress=1.0)
+        save_global_manifest(manifest)
+        return manifest
+
+    for index, file in enumerate(all_files, start=1):
         hash = file.parent.name + file.name
-        processed += 1
+        progress = index / total
 
         if hash in manifest["entries"]:
-            continue
-
-        mod_metadata = read_mod_metadata(file)
-        if mod_metadata:
-            print(f"[{processed}/{total}] Adding {mod_metadata['name']}...")
+            mod_metadata = manifest["entries"][hash].get("mod_metadata", {})
+            if mod_metadata:
+                mod_name = mod_metadata.get("name")
+            else:
+                mod_name = file.parent.name + file.name
+            report(f"Checking {mod_name}...", progress=progress)
         else:
-            logger.debug("Failed to read mod metadata for %s, skipping...", file)
-            print(
-                f"[{processed}/{total}] No metadata for {file.parent.name}/{file.name}"
-            )
-        filename = filename_hash_dict.get(hash)
-        manifest_entry: ManifestEntry = {
-            "filename": filename,
-            "size": file.stat().st_size,
-            "mod_metadata": mod_metadata if mod_metadata else None,
-        }
+            filename = filename_hash_dict.get(hash)
+            mod_metadata = read_mod_metadata(file)
+            if mod_metadata:
+                mod_name = mod_metadata.get("name")
+                report(f"Adding {mod_name}...", progress=progress)
+            else:
+                report(f"Adding {filename}...", progress=progress)
 
-        manifest["entries"][hash] = manifest_entry
+            manifest_entry: ManifestEntry = {
+                "filename": filename,
+                "size": file.stat().st_size,
+                "mod_metadata": mod_metadata if mod_metadata else None,
+            }
 
-    if processed == 0:
-        print("Manifest is already up to date.")
+            manifest["entries"][hash] = manifest_entry
+
     save_global_manifest(manifest)
     return manifest

@@ -12,6 +12,7 @@ from config.user_settings import UserSettings
 from storage.blob_store import BlobStore
 from functions.update_mods import list_updates, Update, copy_updates
 from functions.profile_ops import OnStoreFile, chain_store_file_callbacks
+from functions.manifest import update_manifest
 
 if TYPE_CHECKING:
     from ui.app import App
@@ -57,7 +58,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
 
         self.phase_label = customtkinter.CTkLabel(
             self.status_frame,
-            text="Step 1 of 2: Scanning for updates...",
+            text="Preparing: Updating manifest...",
             anchor="w",
             justify="left",
         )
@@ -68,7 +69,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.status_progressbar.set(0)
 
         self.status_label = customtkinter.CTkLabel(
-            self.status_frame, text="Starting scan...", anchor="w", justify="left"
+            self.status_frame, text="Updating manifest...", anchor="w", justify="left"
         )
         self.status_label.grid(row=3, column=0, padx=20, pady=(6, 0), sticky="w")
 
@@ -173,10 +174,16 @@ class UpdateDialog(customtkinter.CTkToplevel):
             return
         self._start_update_file_copy(self._updates)
 
-    def _start_update_scan(self) -> None:
+    def _begin_step_1_scan(self) -> None:
         self._set_phase(
             "Step 1 of 2: Saving current profile and scanning for updates..."
         )
+        self._report_progress("Saving profile snapshot...", progress=0.0)
+        self._app.begin_save_progress()
+
+    def _start_update_scan(self) -> None:
+        self._set_phase("Preparing: Updating manifest...")
+        self._report_progress("Updating manifest...", progress=0.0)
         self._app.set_busy(True)
         self.update_idletasks()
         on_file = chain_store_file_callbacks(
@@ -184,11 +191,15 @@ class UpdateDialog(customtkinter.CTkToplevel):
             self._app.make_store_file_callback(),
         )
 
+        def manifest_progress(message: str, *, progress: float) -> None:
+            self._report_progress(message, progress=progress)
+
         def scan_worker() -> list[Update] | None:
             updates: list[Update] = []
             failed = False
-            self._app.after(0, self._app.begin_save_progress)
             try:
+                update_manifest(on_progress=manifest_progress)
+                self.after(0, self._begin_step_1_scan)
                 updates = list_updates(
                     self.prof_state,
                     self.blob_store,
