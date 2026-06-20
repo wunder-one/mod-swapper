@@ -35,6 +35,7 @@ class SaveLiveToProfileTests(unittest.TestCase):
             blob_store = Mock()
             dir_manifest = {str(live_dir / "nested.txt"): "hash-store/dir-entry"}
             file_manifest = {str(live_file): "hash-store/file-entry"}
+            global_manifest = {"version": 1, "entries": {}}
 
             with (
                 patch(
@@ -42,12 +43,17 @@ class SaveLiveToProfileTests(unittest.TestCase):
                     temp_root / "profiles",
                 ),
                 patch(
+                    "functions.profile_ops.load_global_manifest",
+                    return_value=global_manifest,
+                ),
+                patch("functions.profile_ops.save_global_manifest") as save_global_manifest_mock,
+                patch(
                     "functions.profile_ops.store_directory",
-                    return_value=(dir_manifest, 0),
+                    return_value=(dir_manifest, 0, global_manifest),
                 ) as store_directory_mock,
                 patch(
                     "functions.profile_ops.store_file",
-                    return_value=(file_manifest, 1),
+                    return_value=(file_manifest, 1, global_manifest),
                 ) as store_file_mock,
                 patch("functions.profile_ops.logger.warning") as warning_mock,
             ):
@@ -60,6 +66,7 @@ class SaveLiveToProfileTests(unittest.TestCase):
             store_directory_mock.assert_called_once_with(
                 live_dir,
                 blob_store,
+                global_manifest,
                 excluded_files=excluded_files,
                 excluded_dirs=excluded_dirs,
                 on_file=None,
@@ -69,12 +76,14 @@ class SaveLiveToProfileTests(unittest.TestCase):
             store_file_mock.assert_called_once_with(
                 live_file,
                 blob_store,
+                global_manifest,
                 excluded_files=excluded_files,
                 excluded_dirs=excluded_dirs,
                 on_file=None,
                 file_index=0,
                 total_files=1,
             )
+            save_global_manifest_mock.assert_called_once_with(global_manifest)
             warning_mock.assert_called_once_with(
                 "Live path does not exist: %s", missing_path
             )
