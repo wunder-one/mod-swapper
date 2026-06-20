@@ -4,7 +4,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class UpdateScanProgress:
     """Bar fill ranges (0.0–1.0) for the update scan dialog, step 1.
-    
+
     The progress bar is divided into four phases:
     - manifest: the progress of the manifest update
     - save: the progress of the save file update
