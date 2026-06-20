@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.3.0] - 2026-06-20
+
+Adds mod version tracking and an update workflow so profiles can pick up newer versions of mods already stored in the blob store.
+
+- Global manifest tracks mod metadata (name, author, UUID, version) keyed by blob hash
+- Vendored lslib `Divine.exe` extracts metadata from `.pak` files; metadata is recorded when files are stored
+- Scans active profile for available updates by matching mod UUIDs and comparing `Version64` across stored blobs
+- New **Update Mods** dialog lists pending updates with version transitions and applies them on confirmation
+- Manifest preparation step with progress reporting; can be cancelled before changes are committed
+- UI disables controls during long operations (swap, profile load/save, update apply)
+- Per-file progress callbacks during profile save; indeterminate progress during profile load
+- Moves `BlobStore` from `functions/` to `storage/`
+
 ## [v0.2.0] - 2026-05-25
 
 Introduces content-addressed blob storage as v2 of the mod storage layer, replacing the old file-copy approach (v1).
