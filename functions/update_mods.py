@@ -54,6 +54,7 @@ def _check_mod_for_update(
     if mod_metadata:
         mod_uuid = mod_metadata.get("uuid")
         newest_so_far = live_hash
+        newest_version64 = mod_metadata.get("version64")
         for entry_hash, entry in global_manifest.get("entries").items():
             if entry_hash == live_hash:
                 continue
@@ -61,8 +62,10 @@ def _check_mod_for_update(
             if not entry_mod_metadata:
                 continue
             if entry_mod_metadata.get("uuid") == mod_uuid:
-                if entry_mod_metadata.get("version64") > mod_metadata.get("version64"):
+                entry_version64 = entry_mod_metadata.get("version64")
+                if entry_version64 > newest_version64:
                     newest_so_far = entry_hash
+                    newest_version64 = entry_version64
         if newest_so_far != live_hash:
             update_hash = newest_so_far
             update_storage_path = Path(update_hash[:2]) / Path(update_hash[2:])
