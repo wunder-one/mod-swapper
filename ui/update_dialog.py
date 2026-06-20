@@ -300,11 +300,9 @@ class UpdateDialog(customtkinter.CTkToplevel):
                     self._set_buttons_busy(False)
                     self._finish_worker()
                 else:
-                    self._set_phase("Step 2 of 2: Complete")
-                    self.status_label.configure(text=f"Updated {len(updates)} mod(s).")
                     self._updates = []
-                    self._show_done_button()
                     self._finish_worker()
+                    self.destroy()
 
             self._app.after(0, on_done)
 
