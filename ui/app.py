@@ -189,7 +189,9 @@ class App(customtkinter.CTk):
         if self._busy:
             return
         if self.update_dialog is None or not self.update_dialog.winfo_exists():
-            window = UpdateDialog(self, self.prof_state, self.user_settings, self.blob_store)
+            window = UpdateDialog(
+                self, self.prof_state, self.user_settings, self.blob_store
+            )
             self.update_dialog = window
             window.bind("<Map>", lambda event: window.focus())
         else:

@@ -132,6 +132,7 @@ def list_updates(
     """
     List all updates for the current profile.
     """
+
     def report(
         message: str,
         *,
@@ -181,9 +182,7 @@ def list_updates(
         )
         if update_info:
             updates.append(update_info)
-            logger.info(
-                f"Update found for {file_path}: {update_info['update_hash']}"
-            )
+            logger.info(f"Update found for {file_path}: {update_info['update_hash']}")
             report(
                 f"Update found: {update_info['mod_name']} "
                 f"({update_info['prev_version']} -> {update_info['new_version']})",
@@ -234,4 +233,3 @@ def copy_updates(
             current_path.unlink(missing_ok=True)
 
     report("Done.", progress=1.0)
-

@@ -56,7 +56,10 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.status_frame.grid_rowconfigure(0, weight=1)
 
         self.phase_label = customtkinter.CTkLabel(
-            self.status_frame, text="Step 1 of 2: Scanning for updates...", anchor="w", justify="left"
+            self.status_frame,
+            text="Step 1 of 2: Scanning for updates...",
+            anchor="w",
+            justify="left",
         )
         self.phase_label.grid(row=0, column=0, padx=20, pady=(0, 0), sticky="w")
 
@@ -159,7 +162,9 @@ class UpdateDialog(customtkinter.CTkToplevel):
             self._show_done_button()
         else:
             self._set_phase("Step 1 of 2: Complete — review updates below")
-            self.status_label.configure(text=f"Found {count} update(s). Ready to update.")
+            self.status_label.configure(
+                text=f"Found {count} update(s). Ready to update."
+            )
             self.button_bar.update_button.configure(state="normal")
         self.status_progressbar.set(1.0)
 
@@ -169,7 +174,9 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self._start_update_file_copy(self._updates)
 
     def _start_update_scan(self) -> None:
-        self._set_phase("Step 1 of 2: Saving current profile and scanning for updates...")
+        self._set_phase(
+            "Step 1 of 2: Saving current profile and scanning for updates..."
+        )
         self._app.set_busy(True)
         self.update_idletasks()
         on_file = chain_store_file_callbacks(

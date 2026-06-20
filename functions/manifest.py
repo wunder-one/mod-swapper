@@ -17,10 +17,12 @@ def load_global_manifest() -> Manifest:
     with manifest_path.open("r") as f:
         return Manifest(**json.load(f))
 
+
 def load_profile_manifest(profile_path: Path) -> dict[str, Any]:
     manifest_path = profile_path / "manifest.json"
     with manifest_path.open("r") as f:
         return json.load(f)
+
 
 def create_filename_hash_dict() -> dict[str, str]:  # [hash: filename]
     filename_hash_dict = {}
@@ -36,21 +38,27 @@ def create_filename_hash_dict() -> dict[str, str]:  # [hash: filename]
     return filename_hash_dict
 
 
-def save(manifest: Manifest) -> None:
+def save_global_manifest(manifest: Manifest) -> None:
     manifest_path = FILE_STORE_DIR / "manifest.json"
     with manifest_path.open("w") as f:
         json.dump(manifest, f, indent=4)
 
 
-def add_manifest_entry(hash: str, source_path: Path, size: int) -> None:
+def add_global_manifest_entry(
+    global_manifest: Manifest, 
+    hash: str, 
+    source_path: Path, 
+    size: int | None = None,
+) -> Manifest:
     mod_metadata = read_mod_metadata(source_path)
-    manifest = load_global_manifest()
-    manifest["entries"][hash] = {
+    if size is None:
+        size = source_path.stat().st_size
+    global_manifest["entries"][hash] = {
         "filename": source_path.name,
         "size": size,
         "mod_metadata": mod_metadata if mod_metadata else None,
     }
-    save(manifest)
+    return global_manifest
 
 
 def update_manifest() -> Manifest:
@@ -74,7 +82,6 @@ def update_manifest() -> Manifest:
         if hash in manifest["entries"]:
             continue
 
-        
         mod_metadata = read_mod_metadata(file)
         if mod_metadata:
             print(f"[{processed}/{total}] Adding {mod_metadata['name']}...")
@@ -94,5 +101,5 @@ def update_manifest() -> Manifest:
 
     if processed == 0:
         print("Manifest is already up to date.")
-    save(manifest)
+    save_global_manifest(manifest)
     return manifest

@@ -8,6 +8,11 @@ import json
 
 from constants import PROFILES_SNAPSHOT_DIR
 from functions.file_actions import get_unique_path
+from functions.manifest import (
+    load_global_manifest,
+    add_global_manifest_entry,
+    save_global_manifest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +80,24 @@ def store_directory(
     *,
     file_index: int = 0,
     total_files: int = 0,
-) -> tuple[dict[str, str], int]:
+) -> tuple[dict[str, str], int, str]:
+    """Store a directory in the blob store and add the file to the global manifest
+    
+    Args:
+        source_dir: The directory to store
+        blob_store: The blob store to use
+        excluded_files: A list of files to exclude from the store
+        excluded_dirs: A list of directories to exclude from the store
+        on_file: A callback to call when a file is stored
+        file_index: The index of the current file
+        total_files: The total number of files to store
+    
+    Returns:
+        A tuple of (manifest_additions, file_index, file_hash)
+        manifest_additions: A dictionary of the files that were stored
+        file_index: The index of the current file
+        file_hash: The hash of the file that was stored
+    """
     logger.debug("Storing directory: %s", source_dir)
     if excluded_files is None:
         excluded_files = list[Path]()
@@ -97,6 +119,7 @@ def store_directory(
                 continue
             # store file in hashed store
             dest_rel, copied_to_store = blob_store.store_file(file_path)
+            file_hash = str(dest_rel).replace("\\", "").replace("/", "")
             logger.debug(
                 "Stored file %s as %s",
                 file_path.relative_to(source_dir),
@@ -111,6 +134,8 @@ def store_directory(
                 on_file(file_path, file_index, total_files, copied_to_store)
             # add file to manifest
             manifest_additions[str(file_path)] = str(dest_rel)
+
+
     logger.info(
         " - Stored directory %s:\n"
         "     %d copied files\n"
@@ -121,7 +146,7 @@ def store_directory(
         skipped_files_count,
         excluded_files_count,
     )
-    return manifest_additions, file_index
+    return manifest_additions, file_index, file_hash
 
 
 def store_file(
@@ -133,14 +158,32 @@ def store_file(
     *,
     file_index: int = 0,
     total_files: int = 0,
-) -> tuple[dict[str, str], int]:
+) -> tuple[dict[str, str], int, str | None]:
+    """Store a file in the blob store and add the file to the global manifest
+    
+    Args:
+        source_path: The file to store
+        blob_store: The blob store to use
+        excluded_files: A list of files to exclude from the store
+        excluded_dirs: A list of directories to exclude from the store
+        on_file: A callback to call when a file is stored
+        file_index: The index of the current file
+        total_files: The total number of files to store
+    
+    Returns:
+        A tuple of (manifest_additions, file_index, file_hash)
+        manifest_additions: A dictionary of the files that were stored
+        file_index: The index of the current file
+        file_hash: The hash of the file that was stored
+    """
     if excluded_files is None:
         excluded_files = list[Path]()
     if excluded_dirs is None:
         excluded_dirs = list[Path]()
     if _is_excluded(source_path, set(excluded_files), set(excluded_dirs)):
-        return {}, file_index
+        return {}, file_index, None
     dest_rel, copied_to_store = blob_store.store_file(source_path)
+    file_hash = str(dest_rel).replace("\\", "").replace("/", "")
     if copied_to_store:
         logger.info("Copied file %s to store", source_path)
     else:
@@ -148,7 +191,7 @@ def store_file(
     file_index += 1
     if on_file is not None:
         on_file(source_path, file_index, total_files, copied_to_store)
-    return {str(source_path): str(dest_rel)}, file_index
+    return {str(source_path): str(dest_rel)}, file_index, file_hash
 
 
 def save_live_to_profile(
@@ -162,12 +205,14 @@ def save_live_to_profile(
         user_settings.swap_paths, excluded_files, excluded_dirs
     )
     file_index = 0
-    manifest = {"version": 2, "targets": {}}
+    profile_manifest = {"version": 2, "targets": {}}
+    global_manifest = load_global_manifest()
+
     for live_path in user_settings.swap_paths:
         if live_path.exists():
             manifest_additions = {}
             if live_path.is_dir():
-                manifest_additions, file_index = store_directory(
+                manifest_additions, file_index, file_hash = store_directory(
                     live_path,
                     blob_store,
                     excluded_files=excluded_files,
@@ -177,7 +222,7 @@ def save_live_to_profile(
                     total_files=total_files,
                 )
             if live_path.is_file():
-                manifest_additions, file_index = store_file(
+                manifest_additions, file_index, file_hash = store_file(
                     live_path,
                     blob_store,
                     excluded_files=excluded_files,
@@ -186,14 +231,18 @@ def save_live_to_profile(
                     file_index=file_index,
                     total_files=total_files,
                 )
-            manifest["targets"].update(manifest_additions)
+            profile_manifest["targets"].update(manifest_additions)
+            if file_hash is not None:
+                global_manifest = add_global_manifest_entry(global_manifest, file_hash, live_path)
         else:
             logger.warning("Live path does not exist: %s", live_path)
 
-    json_data = json.dumps(manifest, indent=4, default=str)
-    manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
-    manifest_file.parent.mkdir(parents=True, exist_ok=True)
-    manifest_file.write_text(json_data, encoding="utf-8")
+    profile_manifest_json = json.dumps(profile_manifest, indent=4, default=str)
+    profile_manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
+    profile_manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    profile_manifest_file.write_text(profile_manifest_json, encoding="utf-8")
+
+    save_global_manifest(global_manifest)
 
 
 def _list_files_to_restore(
@@ -351,9 +400,7 @@ def swap_profile(
             old_profile,
             profile_name,
         )
-        save_live_to_profile(
-            old_profile, blob_store, user_settings, on_file=on_file
-        )
+        save_live_to_profile(old_profile, blob_store, user_settings, on_file=on_file)
     blob_store.save_cache()
 
     try:
@@ -397,9 +444,7 @@ def create_new_profile(
     unique_dir = get_unique_path(PROFILES_SNAPSHOT_DIR / profile_name)
     unique_dir.mkdir(parents=True, exist_ok=False)
     profile_name = unique_dir.name
-    save_live_to_profile(
-        profile_name, blob_store, user_settings, on_file=on_file
-    )
+    save_live_to_profile(profile_name, blob_store, user_settings, on_file=on_file)
     profile_state.active_profile = profile_name
     profile_state.save_config()
     if refresh_profiles is not None:

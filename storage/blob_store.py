@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TypedDict
 
 from constants import FILE_STORE_DIR
-from functions.manifest import add_manifest_entry
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +113,6 @@ class BlobStore:
             raise RuntimeError("Failed to store file %s", source_path)
         logger.debug("Stored file %s as %s", source_path, dest_rel)
         logger.debug("Added file %s to manifest", source_path)
-        add_manifest_entry(hash=file_hash, source_path=source_path, size=stat.st_size)
         return dest_rel, True
 
     def has_blob(self, file_hash: str) -> bool:

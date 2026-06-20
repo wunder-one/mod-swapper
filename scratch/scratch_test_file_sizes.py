@@ -19,11 +19,14 @@ _SKIP_NAMES = {"file_store_cache.json"}
 def find_duplicate_file_sizes() -> dict[int, list[Path]]:
     by_size: dict[int, list[Path]] = defaultdict(list)
     for path in FILE_STORE_DIR.rglob("*"):
-        if not path.is_file() or path.name in _SKIP_NAMES or path.name.startswith("tmp."):
+        if (
+            not path.is_file()
+            or path.name in _SKIP_NAMES
+            or path.name.startswith("tmp.")
+        ):
             continue
         by_size[path.stat().st_size].append(path)
     return {size: paths for size, paths in by_size.items() if len(paths) > 1}
-
 
 
 if __name__ == "__main__":
