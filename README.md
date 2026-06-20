@@ -37,9 +37,10 @@ Copying on top of your old install can leave behind old files. None of your data
 - [x] Swap between profiles
 - [x] Save current mod setup to a new profile
 - [x] Customize which folders you are swapping, with common defaults available
+- [x] Populate mods you updated to other profiles
 
 #### Additional Planned Features
-- [ ] Populate mods you updated to other profiles
+- [ ] UI Cleanup
 
 #### Someday Maybe
 - [ ] Nexus Mods update notifications
