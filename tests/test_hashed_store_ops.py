@@ -46,7 +46,9 @@ class SaveLiveToProfileTests(unittest.TestCase):
                     "functions.profile_ops.load_global_manifest",
                     return_value=global_manifest,
                 ),
-                patch("functions.profile_ops.save_global_manifest") as save_global_manifest_mock,
+                patch(
+                    "functions.profile_ops.save_global_manifest"
+                ) as save_global_manifest_mock,
                 patch(
                     "functions.profile_ops.store_directory",
                     return_value=(dir_manifest, 0, global_manifest),
