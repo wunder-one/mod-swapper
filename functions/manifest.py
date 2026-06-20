@@ -50,9 +50,9 @@ def save_global_manifest(manifest: Manifest) -> None:
 
 
 def add_global_manifest_entry(
-    global_manifest: Manifest, 
-    hash: str, 
-    source_path: Path, 
+    global_manifest: Manifest,
+    hash: str,
+    source_path: Path,
     size: int | None = None,
 ) -> Manifest:
     if hash not in global_manifest["entries"]:

@@ -84,7 +84,7 @@ def store_directory(
     total_files: int = 0,
 ) -> tuple[dict[str, str], int, Manifest]:
     """Store a directory in the blob store and add the file to the global manifest
-    
+
     Args:
         source_dir: The directory to store
         blob_store: The blob store to use
@@ -94,7 +94,7 @@ def store_directory(
         on_file: A callback to call when a file is stored
         file_index: The index of the current file
         total_files: The total number of files to store
-    
+
     Returns:
         A tuple of (profile_manifest_additions, file_index, file_hash)
         profile_manifest_additions: A dictionary of the files that were stored
@@ -137,7 +137,9 @@ def store_directory(
                 on_file(file_path, file_index, total_files, copied_to_store)
             # add file to manifest
             profile_manifest_additions[str(file_path)] = str(dest_rel)
-            global_manifest = add_global_manifest_entry(global_manifest, file_hash, file_path)
+            global_manifest = add_global_manifest_entry(
+                global_manifest, file_hash, file_path
+            )
 
     logger.info(
         " - Stored directory %s:\n"
@@ -164,7 +166,7 @@ def store_file(
     total_files: int = 0,
 ) -> tuple[dict[str, str], int, Manifest]:
     """Store a file in the blob store and add the file to the global manifest
-    
+
     Args:
         source_path: The file to store
         blob_store: The blob store to use
@@ -174,7 +176,7 @@ def store_file(
         on_file: A callback to call when a file is stored
         file_index: The index of the current file
         total_files: The total number of files to store
-    
+
     Returns:
         A tuple of (profile_manifest_additions, file_index, file_hash)
         profile_manifest_additions: A dictionary of the files that were stored
@@ -190,7 +192,9 @@ def store_file(
     dest_rel, copied_to_store = blob_store.store_file(source_path)
     if copied_to_store:
         file_hash = str(dest_rel).replace("\\", "").replace("/", "")
-        global_manifest = add_global_manifest_entry(global_manifest, file_hash, source_path)
+        global_manifest = add_global_manifest_entry(
+            global_manifest, file_hash, source_path
+        )
         logger.info("Copied file %s to store", source_path)
     else:
         logger.info("File %s already in store", source_path)
@@ -218,15 +222,17 @@ def save_live_to_profile(
         if live_path.exists():
             profile_manifest_additions = {}
             if live_path.is_dir():
-                profile_manifest_additions, file_index, global_manifest = store_directory(
-                    live_path,
-                    blob_store,
-                    global_manifest,
-                    excluded_files=excluded_files,
-                    excluded_dirs=excluded_dirs,
-                    on_file=on_file,
-                    file_index=file_index,
-                    total_files=total_files,
+                profile_manifest_additions, file_index, global_manifest = (
+                    store_directory(
+                        live_path,
+                        blob_store,
+                        global_manifest,
+                        excluded_files=excluded_files,
+                        excluded_dirs=excluded_dirs,
+                        on_file=on_file,
+                        file_index=file_index,
+                        total_files=total_files,
+                    )
                 )
             if live_path.is_file():
                 profile_manifest_additions, file_index, global_manifest = store_file(

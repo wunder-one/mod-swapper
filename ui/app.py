@@ -15,7 +15,6 @@ from config.user_settings import UserSettings
 from storage.blob_store import BlobStore
 from functions.profile_ops import (
     OnStoreFile,
-    chain_store_file_callbacks,
     create_new_profile,
     delete_profile,
     swap_profile,
