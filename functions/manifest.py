@@ -11,6 +11,10 @@ from constants import FILE_STORE_DIR, PROFILES_SNAPSHOT_DIR
 logger = logging.getLogger(__name__)
 
 
+class UpdateCancelled(Exception):
+    """Raised when a cancellable manifest update is aborted by the user."""
+
+
 def load_global_manifest() -> Manifest:
     manifest_path = FILE_STORE_DIR / "manifest.json"
     if not manifest_path.exists():
@@ -65,10 +69,22 @@ def add_global_manifest_entry(
 
 def update_manifest(
     on_progress: Callable[..., None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+    on_commit: Callable[[], None] | None = None,
 ) -> Manifest:
     def report(message: str, *, progress: float) -> None:
         if on_progress is not None:
             on_progress(message, progress=progress)
+
+    def check_cancelled() -> None:
+        if should_cancel is not None and should_cancel():
+            raise UpdateCancelled()
+
+    def commit_and_save() -> None:
+        check_cancelled()
+        if on_commit is not None:
+            on_commit()
+        save_global_manifest(manifest)
 
     manifest = load_global_manifest()
 
@@ -84,10 +100,12 @@ def update_manifest(
 
     if total == 0:
         report("Manifest is already up to date.", progress=1.0)
-        save_global_manifest(manifest)
+        check_cancelled()
+        commit_and_save()
         return manifest
 
     for index, file in enumerate(all_files, start=1):
+        check_cancelled()
         hash = file.parent.name + file.name
         progress = index / total
 
@@ -115,5 +133,5 @@ def update_manifest(
 
             manifest["entries"][hash] = manifest_entry
 
-    save_global_manifest(manifest)
+    commit_and_save()
     return manifest

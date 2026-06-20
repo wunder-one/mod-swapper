@@ -12,7 +12,7 @@ from config.user_settings import UserSettings
 from storage.blob_store import BlobStore
 from functions.update_mods import list_updates, Update, copy_updates
 from functions.profile_ops import OnStoreFile, chain_store_file_callbacks
-from functions.manifest import update_manifest
+from functions.manifest import update_manifest, UpdateCancelled
 
 if TYPE_CHECKING:
     from ui.app import App
@@ -37,6 +37,9 @@ class UpdateDialog(customtkinter.CTkToplevel):
         self.user_settings = user_settings
         self._updates: list[Update] = []
         self._dialog_busy = False
+        self._committed = False
+        self._cancel_event = threading.Event()
+        self._worker_running = False
 
         self.title("Updating Mods")
         win_width = 500
@@ -98,10 +101,28 @@ class UpdateDialog(customtkinter.CTkToplevel):
             state="normal",
         )
 
+    def _can_cancel(self) -> bool:
+        return not self._committed and not self._dialog_busy
+
     def _on_close_requested(self) -> None:
-        if self._dialog_busy:
+        if not self._can_cancel():
+            return
+        if self._worker_running:
+            if self._cancel_event.is_set():
+                return
+            self._cancel_event.set()
+            self.button_bar.cancel_button.configure(state="disabled")
+            self._report_progress("Cancelling...")
             return
         self.destroy()
+
+    def _on_manifest_commit(self) -> None:
+        self._committed = True
+        self.after(0, self._disable_cancel_button)
+
+    def _disable_cancel_button(self) -> None:
+        if self.winfo_exists():
+            self.button_bar.cancel_button.configure(state="disabled")
 
     def _set_phase(self, text: str) -> None:
         def apply() -> None:
@@ -145,14 +166,26 @@ class UpdateDialog(customtkinter.CTkToplevel):
 
         return on_file
 
+    def _finish_worker(self) -> None:
+        self._app.hide_progress_bar()
+        self._app.set_busy(False)
+
+    def _on_scan_cancelled(self) -> None:
+        self._finish_worker()
+        if self.winfo_exists():
+            self.destroy()
+
     def _on_scan_complete(self, updates: list[Update], *, failed: bool = False) -> None:
         if not self.winfo_exists():
+            self._finish_worker()
             return
+        self._committed = False
         if failed:
             self._set_phase("Step 1 of 2: Scan failed")
             self.status_label.configure(text="Update scan failed.")
             self.status_progressbar.set(0)
             self.button_bar.update_button.configure(state="disabled")
+            self._finish_worker()
             return
 
         self._updates = updates
@@ -168,6 +201,7 @@ class UpdateDialog(customtkinter.CTkToplevel):
             )
             self.button_bar.update_button.configure(state="normal")
         self.status_progressbar.set(1.0)
+        self._finish_worker()
 
     def _on_update_clicked(self) -> None:
         if not self._updates:
@@ -195,10 +229,16 @@ class UpdateDialog(customtkinter.CTkToplevel):
             self._report_progress(message, progress=progress)
 
         def scan_worker() -> list[Update] | None:
+            self._worker_running = True
             updates: list[Update] = []
             failed = False
+            cancelled = False
             try:
-                update_manifest(on_progress=manifest_progress)
+                update_manifest(
+                    on_progress=manifest_progress,
+                    should_cancel=self._cancel_event.is_set,
+                    on_commit=self._on_manifest_commit,
+                )
                 self.after(0, self._begin_step_1_scan)
                 updates = list_updates(
                     self.prof_state,
@@ -207,17 +247,24 @@ class UpdateDialog(customtkinter.CTkToplevel):
                     on_progress=self._report_progress,
                     on_file=on_file,
                 )
+            except UpdateCancelled:
+                cancelled = True
             except Exception:
                 logger.exception("Update scan failed.")
                 failed = True
                 return None
 
             def on_done() -> None:
-                self._app.hide_progress_bar()
-                self._app.set_busy(False)
+                self._worker_running = False
+                if cancelled:
+                    self._app.after(0, self._on_scan_cancelled)
+                    return
+                if not self.winfo_exists():
+                    self._finish_worker()
+                    return
                 self._on_scan_complete(updates, failed=failed)
 
-            self.after(0, on_done)
+            self._app.after(0, on_done)
             return updates
 
         threading.Thread(target=scan_worker, daemon=True).start()
@@ -244,21 +291,22 @@ class UpdateDialog(customtkinter.CTkToplevel):
 
             def on_done() -> None:
                 self._dialog_busy = False
-                self._app.hide_progress_bar()
-                self._app.set_busy(False)
                 if not self.winfo_exists():
+                    self._finish_worker()
                     return
                 if failed:
                     self._set_phase("Step 2 of 2: Update failed")
                     self.status_label.configure(text="Update failed.")
                     self._set_buttons_busy(False)
+                    self._finish_worker()
                 else:
                     self._set_phase("Step 2 of 2: Complete")
                     self.status_label.configure(text=f"Updated {len(updates)} mod(s).")
                     self._updates = []
                     self._show_done_button()
+                    self._finish_worker()
 
-            self.after(0, on_done)
+            self._app.after(0, on_done)
 
         threading.Thread(target=copy_worker, daemon=True).start()
 
@@ -271,7 +319,7 @@ class ButtonBar(customtkinter.CTkFrame):
         self.grid_columnconfigure(3, weight=1)
 
         self.cancel_button = customtkinter.CTkButton(
-            self, text="Cancel", command=self._master.destroy, width=100
+            self, text="Cancel", command=self._master._on_close_requested, width=100
         )
         self.cancel_button.grid(row=0, column=3, padx=(0, 6), pady=6, sticky="e")
 
