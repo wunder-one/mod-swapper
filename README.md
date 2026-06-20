@@ -21,6 +21,11 @@ Mod swapper for Baldur's Gate 3. Let's you completely replace all mod related fi
 
 Keep the extracted folder together; the app expects its bundled files next to the executable. If Windows SmartScreen warns about an unknown publisher, you can choose “More info” → “Run anyway” after you trust the download.
 
+### Updating
+
+To install a newer release, download the latest `.zip` and extract it to a **new folder**, or **delete your old install folder first** and then extract there.
+
+Copying on top of your old install can leave behind old files. None of your data or settings are stored in the app's folder.
 
 ## Screenshots
 
