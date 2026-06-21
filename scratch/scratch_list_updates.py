@@ -43,7 +43,11 @@ def scratch():
             update["prev_version"],
             update["new_version"],
         )
-        target_path = (update["current_path"].parent / update["target_filename"]) if update["target_filename"] else update["current_path"]
+        target_path = (
+            (update["current_path"].parent / update["target_filename"])
+            if update["target_filename"]
+            else update["current_path"]
+        )
         logger.info("      target: %s", target_path)
         logger.info("      blob:   %s", update["update_storage_path"])
 
