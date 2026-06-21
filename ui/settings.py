@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 import customtkinter
 from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING
 
 from config.user_settings import UserSettings
+from constants import PROFILES_SNAPSHOT_DIR
 
 if TYPE_CHECKING:
     from ui.app import App
@@ -125,6 +127,24 @@ class SettingsWindow(customtkinter.CTkToplevel):
         self.protected_paths_fr.reset_paths(self.user_settings.user_protected_paths)
 
     def apply_settings(self):
+        if self.user_settings.swap_paths != self.swap_paths_fr.get():
+            stale_profiles = []
+            for profile in PROFILES_SNAPSHOT_DIR.iterdir():
+                if profile.is_dir():
+                    profile_name = profile.name
+                    with (profile / "manifest.json").open("r", encoding="utf-8") as f:
+                        profile_manifest = json.load(f)
+                    if profile_manifest["version"] < 3:
+                        stale_profiles.append(profile_name)
+            if stale_profiles:
+                confirm_dialog = messagebox.askyesno(
+                    "Confirm New Swap Path(s)",
+                    f"The following profiles will ignore your new swap path(s): {', '.join(stale_profiles)}. Are you sure you want to continue?",
+                    parent=self,
+                )
+                if confirm_dialog:
+                    self.user_settings.swap_paths = self.swap_paths_fr.get()
+
         match self.install_type_fr.get():
             case "Steam":
                 self.user_settings.install_type = "steam"
@@ -133,7 +153,6 @@ class SettingsWindow(customtkinter.CTkToplevel):
             case "Custom":
                 self.user_settings.install_type = "custom"
         self.user_settings.game_folder = self.game_folder_fr.get()
-        self.user_settings.swap_paths = self.swap_paths_fr.get()
         self.user_settings.user_protected_paths = self.protected_paths_fr.get()
         # fetch current values from settings window
         # and save to self.user_settings
