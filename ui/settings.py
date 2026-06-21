@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import customtkinter
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING
 
 from config.user_settings import UserSettings
@@ -229,7 +229,16 @@ class PathListEditor(customtkinter.CTkFrame):
     def add_entry_to_list(self):
         path = self.new_entry.get()
         if path:
-            self.scrollable_path_frame.add_new_path(Path(path))
+            path = Path(path)
+            if not path.exists():
+                confirm_dialog = messagebox.askyesno(
+                    "Confirm Add", 
+                    f"There is no file or folder at '{path}'. Are you sure you want to add it?",
+                    parent=self,
+                )
+                if not confirm_dialog:
+                    return
+            self.scrollable_path_frame.add_new_path(path)
 
     def browse_folders(self):
         path = filedialog.askdirectory(
