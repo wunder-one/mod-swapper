@@ -1,12 +1,13 @@
 import logging
 from collections.abc import Callable
 from pathlib import Path
+from typing import TypedDict
+import json
+
 from config.manifest import Manifest
 from storage.blob_store import BlobStore
 from config.user_settings import UserSettings
 from config.profile_state import ProfileState
-import json
-
 from constants import PROFILES_SNAPSHOT_DIR
 from functions.file_actions import get_unique_path
 from functions.manifest import (
@@ -16,6 +17,13 @@ from functions.manifest import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class ProfileManifest(TypedDict):
+    version: int
+    swap_paths: list[Path]
+    targets: dict[str, str]
+
 
 OnStoreFile = Callable[[Path, int, int], None]
 # args: file_path, index (1-based), total_files
@@ -217,7 +225,11 @@ def save_live_to_profile(
         user_settings.swap_paths, excluded_files, excluded_dirs
     )
     file_index = 0
-    profile_manifest = {"version": 2, "targets": {}}
+    profile_manifest = {
+        "version": 3,
+        "swap_paths": user_settings.swap_paths,
+        "targets": {},
+    }
     global_manifest = load_global_manifest()
 
     for live_path in user_settings.swap_paths:
@@ -262,11 +274,9 @@ def save_live_to_profile(
 def _list_files_to_restore(
     profile_name: str,
     blob_store: BlobStore,
+    manifest: ProfileManifest,
 ) -> list[tuple[Path, Path]]:
 
-    manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
-    with manifest_file.open("r", encoding="utf-8") as f:
-        manifest = json.load(f)
     files_to_restore: list[tuple[Path, Path]] = []
     skipped_files_count = 0
     restored_files_count = 0
@@ -362,12 +372,18 @@ def load_profile_to_live(
     user_settings: UserSettings,
     on_load_start: OnLoadStart | None = None,
 ):
+    manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
+    with manifest_file.open("r", encoding="utf-8") as f:
+        manifest: ProfileManifest = json.load(f)
     # get files to restore and remove
-    files_to_restore = _list_files_to_restore(profile_name, blob_store)
+    files_to_restore = _list_files_to_restore(profile_name, blob_store, manifest)
     excluded_files, excluded_dirs = user_settings.get_all_protected_paths()
+    swap_paths = (
+        manifest["swap_paths"] if manifest["version"] >= 3 else user_settings.swap_paths
+    )
     files_to_remove = _list_files_to_remove(
         profile_name,
-        user_settings.swap_paths,
+        swap_paths,
         excluded_files=excluded_files,
         excluded_dirs=excluded_dirs,
     )
