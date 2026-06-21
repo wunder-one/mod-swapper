@@ -232,7 +232,7 @@ class PathListEditor(customtkinter.CTkFrame):
             path = Path(path)
             if not path.exists():
                 confirm_dialog = messagebox.askyesno(
-                    "Confirm Add", 
+                    "Confirm Add",
                     f"There is no file or folder at '{path}'. Are you sure you want to add it?",
                     parent=self,
                 )

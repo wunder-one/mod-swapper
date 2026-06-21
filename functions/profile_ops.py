@@ -108,11 +108,13 @@ def store_directory(
     excluded_files_count = 0
     skipped_files_count = 0
     copied_files_count = 0
+    excluded_files_set = set(excluded_files)
+    excluded_dirs_set = set(excluded_dirs)
     for root, _, files in source_dir.walk():
         for filename in files:
             file_path = root / filename
             # skip protected files and directories
-            if _is_excluded(file_path, set(excluded_files), set(excluded_dirs)):
+            if _is_excluded(file_path, excluded_files_set, excluded_dirs_set):
                 logger.debug(
                     "File %s is excluded. Skipping.", file_path.relative_to(source_dir)
                 )
@@ -185,7 +187,9 @@ def store_file(
         excluded_files = list[Path]()
     if excluded_dirs is None:
         excluded_dirs = list[Path]()
-    if _is_excluded(source_path, set(excluded_files), set(excluded_dirs)):
+    excluded_files_set = set(excluded_files)
+    excluded_dirs_set = set(excluded_dirs)
+    if _is_excluded(source_path, excluded_files_set, excluded_dirs_set):
         return {}, file_index, global_manifest
     dest_rel, copied_to_store = blob_store.store_file(source_path)
     if copied_to_store:
@@ -317,11 +321,13 @@ def _list_files_to_remove(
         manifest = json.load(f)
     target_paths = {Path(path).resolve() for path in manifest["targets"].keys()}
     files_to_remove = list[Path]()
+    excluded_files_set = set(excluded_files)
+    excluded_dirs_set = set(excluded_dirs)
     for swap_path in swap_paths:
         if (
             swap_path.exists()
             and swap_path.is_file()
-            and not _is_excluded(swap_path, set(excluded_files), set(excluded_dirs))
+            and not _is_excluded(swap_path, excluded_files_set, excluded_dirs_set)
             and swap_path.resolve() not in target_paths
         ):
             logger.debug("Adding singlefile %s to remove list", swap_path)
@@ -329,7 +335,7 @@ def _list_files_to_remove(
         elif (
             swap_path.exists()
             and swap_path.is_dir()
-            and not _is_excluded(swap_path, set(excluded_files), set(excluded_dirs))
+            and not _is_excluded(swap_path, excluded_files_set, excluded_dirs_set)
         ):
             for root, _, files in swap_path.walk():
                 for filename in files:
@@ -337,7 +343,7 @@ def _list_files_to_remove(
                     # skip protected files and directories
                     if (
                         not _is_excluded(
-                            file_path, set(excluded_files), set(excluded_dirs)
+                            file_path, excluded_files_set, excluded_dirs_set
                         )
                         and file_path.resolve() not in target_paths
                     ):
