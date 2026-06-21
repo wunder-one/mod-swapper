@@ -3,7 +3,8 @@ import logging
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict
+from os import stat_result
+from typing import NotRequired, TypedDict
 
 from constants import FILE_STORE_DIR
 
@@ -13,7 +14,17 @@ logger = logging.getLogger(__name__)
 class FileMeta(TypedDict):
     size: int
     mtime: float
+    mtime_ns: NotRequired[int]
     hash: str
+
+
+class CacheManifest(TypedDict):
+    version: int
+    entries: dict[str, FileMeta]
+
+
+CACHE_VERSION = 2
+SUPPORTED_CACHE_VERSIONS = {1, CACHE_VERSION}
 
 
 @dataclass
@@ -33,13 +44,24 @@ class BlobStore:
             return cache
         with cache.cache_file.open("r", encoding="utf-8") as f:
             data = json.load(f)
-            cache.cache = {k: FileMeta(**v) for k, v in data.items()}
+            if data.get("version") in SUPPORTED_CACHE_VERSIONS and "entries" in data:
+                entries = data["entries"]
+            elif "version" in data and "entries" in data:
+                logger.warning(
+                    "Unsupported file store cache version %s. Rebuilding cache.",
+                    data["version"],
+                )
+                return cache
+            else:
+                entries = data
+            cache.cache = {k: FileMeta(**v) for k, v in entries.items()}
             return cache
 
     def save_cache(self):
         self.store_dir.mkdir(parents=True, exist_ok=True)
+        manifest: CacheManifest = {"version": CACHE_VERSION, "entries": self.cache}
         with self.cache_file.open("w", encoding="utf-8") as f:
-            json.dump(self.cache, f, indent=4, default=str)
+            json.dump(manifest, f, indent=4, default=str)
 
     @staticmethod
     def _hash(path: Path) -> str:
@@ -49,21 +71,36 @@ class BlobStore:
                 h.update(chunk)
         return h.hexdigest()
 
+    @staticmethod
+    def _file_meta(stat: stat_result, file_hash: str) -> FileMeta:
+        return FileMeta(
+            size=stat.st_size,
+            mtime=stat.st_mtime,
+            mtime_ns=stat.st_mtime_ns,
+            hash=file_hash,
+        )
+
+    @staticmethod
+    def _matches_stat(entry: FileMeta, stat: stat_result) -> bool:
+        return (
+            entry["size"] == stat.st_size
+            and "mtime_ns" in entry
+            and entry["mtime_ns"] == stat.st_mtime_ns
+        )
+
     def get_cached_hash(self, path: Path) -> str:
         """Compute the SHA-256 hash of *path*, using the cache for performance.
 
-        Returns the cached hash if the file's size and mtime match the
+        Returns the cached hash if the file's size and mtime_ns match the
         cache entry; otherwise hashes the file and stores it in the cache.
         """
         stat = path.stat()
         entry = self.cache.get(str(path))
-        if entry and entry["size"] == stat.st_size and entry["mtime"] == stat.st_mtime:
+        if entry and self._matches_stat(entry, stat):
             logger.debug("Cache hit for %s", path)
             return entry["hash"]
         file_hash = self._hash(path)
-        self.cache[str(path)] = FileMeta(
-            size=stat.st_size, mtime=stat.st_mtime, hash=file_hash
-        )
+        self.cache[str(path)] = self._file_meta(stat, file_hash)
         return file_hash
 
     def get_file_meta(self, path: Path) -> FileMeta | None:
@@ -79,8 +116,8 @@ class BlobStore:
     def store_file(self, source_path: Path) -> tuple[Path, bool]:
         """Store ``source_path`` as a content-addressed blob under ``store_dir``.
 
-        Always computes the file hash from bytes to guarantee the stored blob
-        matches the actual file content.
+        Reuses cached hashes only when the file's size and mtime_ns match and
+        the referenced blob already exists; otherwise hashes the source bytes.
 
         Args:
             source_path: File to ingest into the store.
@@ -93,11 +130,15 @@ class BlobStore:
         Raises:
             RuntimeError: If the blob is still missing after an attempted copy.
         """
-        file_hash = self._hash(source_path)
         stat = source_path.stat()
-        self.cache[str(source_path)] = FileMeta(
-            size=stat.st_size, mtime=stat.st_mtime, hash=file_hash
-        )
+        entry = self.cache.get(str(source_path))
+        if entry and self._matches_stat(entry, stat) and self.has_blob(entry["hash"]):
+            dest = self._blob_path(entry["hash"])
+            logger.debug("Cache hit for %s. Skipping hash and copy.", source_path)
+            return dest.relative_to(self.store_dir), False
+
+        file_hash = self._hash(source_path)
+        self.cache[str(source_path)] = self._file_meta(stat, file_hash)
         dest = self._blob_path(file_hash)
         dest_rel = dest.relative_to(self.store_dir)
 
