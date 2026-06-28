@@ -9,7 +9,7 @@ from storage.blob_store import BlobStore
 from config.user_settings import UserSettings
 from config.profile_state import ProfileState
 from constants import PROFILES_SNAPSHOT_DIR
-from functions.file_actions import get_unique_path
+from functions.file_ops import get_unique_path
 from functions.manifest import (
     load_global_manifest,
     add_global_manifest_entry,

@@ -1,6 +1,8 @@
 """
 This is a legacy module that has been replaced by the profile_ops module.
-It is kept here for backwards compatibility.
+
+Dead code that was being shipped. 
+Was also missing some of the protections in the newer blob storage setup.
 """
 
 import json
