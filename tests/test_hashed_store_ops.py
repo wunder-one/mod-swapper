@@ -2,7 +2,13 @@ import json
 from unittest.mock import Mock, patch
 
 from storage.blob_store import BlobStore
-from functions.profile_ops import save_live_to_profile, _list_files_to_restore
+from functions.profile_ops import (
+    ProfileManifest,
+    load_profile_to_live,
+    save_live_to_profile,
+    upgrade_outdated_profile_manifests,
+    _list_files_to_restore,
+)
 
 
 def test_save_live_to_profile_writes_manifest(tmp_path):
@@ -86,17 +92,77 @@ def test_save_live_to_profile_writes_manifest(tmp_path):
     assert manifest_file.exists()
 
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-    assert manifest["version"] == 2
+    assert manifest["version"] == 3
+    assert manifest["swap_paths"] == [str(live_dir), str(live_file), str(missing_path)]
     assert manifest["targets"] == {
         str(live_dir / "nested.txt"): "hash-store/dir-entry",
         str(live_file): "hash-store/file-entry",
     }
 
 
+def test_upgrade_outdated_profile_manifests_pins_current_swap_paths(tmp_path):
+    profiles_dir = tmp_path / "profiles"
+    old_profile_dir = profiles_dir / "old-profile"
+    current_profile_dir = profiles_dir / "current-profile"
+    old_profile_dir.mkdir(parents=True)
+    current_profile_dir.mkdir()
+
+    old_manifest = {
+        "version": 2,
+        "targets": {str(tmp_path / "live.txt"): "hash-store/live-entry"},
+    }
+    current_manifest = {
+        "version": 3,
+        "swap_paths": [str(tmp_path / "already-pinned")],
+        "targets": {},
+    }
+    (old_profile_dir / "manifest.json").write_text(
+        json.dumps(old_manifest),
+        encoding="utf-8",
+    )
+    (current_profile_dir / "manifest.json").write_text(
+        json.dumps(current_manifest),
+        encoding="utf-8",
+    )
+
+    swap_paths = [tmp_path / "mods", tmp_path / "modsettings.lsx"]
+    with patch("functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir):
+        upgraded_profiles = upgrade_outdated_profile_manifests(swap_paths)
+
+    assert upgraded_profiles == ["old-profile"]
+    migrated_manifest = json.loads(
+        (old_profile_dir / "manifest.json").read_text(encoding="utf-8")
+    )
+    untouched_manifest = json.loads(
+        (current_profile_dir / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert migrated_manifest["version"] == 3
+    assert migrated_manifest["swap_paths"] == [str(path) for path in swap_paths]
+    assert migrated_manifest["targets"] == old_manifest["targets"]
+    assert untouched_manifest == current_manifest
+
+
+def test_upgrade_outdated_profile_manifests_skips_bad_manifest(tmp_path):
+    profiles_dir = tmp_path / "profiles"
+    bad_profile_dir = profiles_dir / "bad-profile"
+    bad_profile_dir.mkdir(parents=True)
+    (bad_profile_dir / "manifest.json").write_text("{bad json", encoding="utf-8")
+
+    with (
+        patch("functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir),
+        patch("functions.profile_ops.logger.warning") as warning_mock,
+    ):
+        upgraded_profiles = upgrade_outdated_profile_manifests([tmp_path / "mods"])
+
+    assert upgraded_profiles == []
+    warning_mock.assert_called_once()
+    assert (bad_profile_dir / "manifest.json").read_text(
+        encoding="utf-8"
+    ) == "{bad json"
+
+
 def test_hash_mismatch_triggers_restore(tmp_path):
     store_dir = tmp_path / "store"
-    profiles_dir = tmp_path / "profiles"
-    profiles_dir.mkdir(parents=True)
     store = BlobStore.load_cache(store_dir=store_dir)
 
     blob_src = tmp_path / "v1.txt"
@@ -106,17 +172,13 @@ def test_hash_mismatch_triggers_restore(tmp_path):
     live_file = tmp_path / "live.txt"
     live_file.write_text("v2 content", encoding="utf-8")
 
-    manifest = {
-        "version": 2,
+    manifest: ProfileManifest = {
+        "version": 3,
+        "swap_paths": [live_file],
         "targets": {str(live_file): str(dest_rel)},
     }
-    profile_name = "test-profile"
-    manifest_file = profiles_dir / profile_name / "manifest.json"
-    manifest_file.parent.mkdir(parents=True, exist_ok=True)
-    manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
 
-    with patch("functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir):
-        files_to_restore = _list_files_to_restore(profile_name, store)
+    files_to_restore = _list_files_to_restore("test-profile", store, manifest)
 
     assert len(files_to_restore) == 1
     assert files_to_restore[0][0] == live_file
@@ -124,33 +186,25 @@ def test_hash_mismatch_triggers_restore(tmp_path):
 
 def test_hash_match_skips_restore(tmp_path):
     store_dir = tmp_path / "store"
-    profiles_dir = tmp_path / "profiles"
-    profiles_dir.mkdir(parents=True)
     store = BlobStore.load_cache(store_dir=store_dir)
 
     live_file = tmp_path / "live.txt"
     live_file.write_text("same content", encoding="utf-8")
     dest_rel, _ = store.store_file(live_file)
 
-    manifest = {
-        "version": 2,
+    manifest: ProfileManifest = {
+        "version": 3,
+        "swap_paths": [live_file],
         "targets": {str(live_file): str(dest_rel)},
     }
-    profile_name = "test-profile"
-    manifest_file = profiles_dir / profile_name / "manifest.json"
-    manifest_file.parent.mkdir(parents=True, exist_ok=True)
-    manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
 
-    with patch("functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir):
-        files_to_restore = _list_files_to_restore(profile_name, store)
+    files_to_restore = _list_files_to_restore("test-profile", store, manifest)
 
     assert len(files_to_restore) == 0
 
 
 def test_missing_file_triggers_restore(tmp_path):
     store_dir = tmp_path / "store"
-    profiles_dir = tmp_path / "profiles"
-    profiles_dir.mkdir(parents=True)
     store = BlobStore.load_cache(store_dir=store_dir)
 
     blob_src = tmp_path / "blob.txt"
@@ -159,17 +213,52 @@ def test_missing_file_triggers_restore(tmp_path):
 
     live_file = tmp_path / "missing.txt"
 
-    manifest = {
-        "version": 2,
+    manifest: ProfileManifest = {
+        "version": 3,
+        "swap_paths": [live_file],
         "targets": {str(live_file): str(dest_rel)},
     }
-    profile_name = "test-profile"
-    manifest_file = profiles_dir / profile_name / "manifest.json"
-    manifest_file.parent.mkdir(parents=True, exist_ok=True)
-    manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
 
-    with patch("functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir):
-        files_to_restore = _list_files_to_restore(profile_name, store)
+    files_to_restore = _list_files_to_restore("test-profile", store, manifest)
 
     assert len(files_to_restore) == 1
     assert files_to_restore[0][0] == live_file
+
+
+def test_load_profile_to_live_converts_manifest_swap_paths_to_paths(tmp_path):
+    profile_name = "test-profile"
+    profiles_dir = tmp_path / "profiles"
+    profile_dir = profiles_dir / profile_name
+    profile_dir.mkdir(parents=True)
+
+    live_dir = tmp_path / "live-dir"
+    manifest = {
+        "version": 3,
+        "swap_paths": [str(live_dir)],
+        "targets": {},
+    }
+    (profile_dir / "manifest.json").write_text(
+        json.dumps(manifest),
+        encoding="utf-8",
+    )
+
+    user_settings = Mock()
+    user_settings.swap_paths = [tmp_path / "new-live-dir"]
+    user_settings.get_all_protected_paths.return_value = ([], [])
+    blob_store = Mock()
+
+    with (
+        patch("functions.profile_ops.PROFILES_SNAPSHOT_DIR", profiles_dir),
+        patch("functions.profile_ops._list_files_to_restore", return_value=[]),
+        patch(
+            "functions.profile_ops._list_files_to_remove", return_value=[]
+        ) as remove_mock,
+    ):
+        load_profile_to_live(profile_name, blob_store, user_settings)
+
+    remove_mock.assert_called_once_with(
+        profile_name,
+        [live_dir],
+        excluded_files=[],
+        excluded_dirs=[],
+    )

@@ -1,12 +1,13 @@
 import logging
 from collections.abc import Callable
 from pathlib import Path
+from typing import TypedDict
+import json
+
 from config.manifest import Manifest
 from storage.blob_store import BlobStore
 from config.user_settings import UserSettings
 from config.profile_state import ProfileState
-import json
-
 from constants import PROFILES_SNAPSHOT_DIR
 from functions.file_actions import get_unique_path
 from functions.manifest import (
@@ -17,10 +18,65 @@ from functions.manifest import (
 
 logger = logging.getLogger(__name__)
 
+
+class ProfileManifest(TypedDict):
+    version: int
+    swap_paths: list[Path]
+    targets: dict[str, str]
+
+
 OnStoreFile = Callable[[Path, int, int], None]
 # args: file_path, index (1-based), total_files
 
 OnLoadStart = Callable[[], None]
+
+
+def upgrade_outdated_profile_manifests(swap_paths: list[Path]) -> list[str]:
+    """Pin old profile manifests to the current swap paths before settings change."""
+    upgraded_profiles: list[str] = []
+    if not PROFILES_SNAPSHOT_DIR.exists():
+        return upgraded_profiles
+
+    for profile_dir in PROFILES_SNAPSHOT_DIR.iterdir():
+        if not profile_dir.is_dir():
+            continue
+
+        manifest_file = profile_dir / "manifest.json"
+        if not manifest_file.exists():
+            continue
+
+        try:
+            with manifest_file.open("r", encoding="utf-8") as f:
+                profile_manifest = json.load(f)
+        except (OSError, json.JSONDecodeError, TypeError) as e:
+            logger.warning(
+                "Skipping profile manifest migration for %s: %s",
+                profile_dir.name,
+                e,
+            )
+            continue
+
+        try:
+            manifest_version = int(profile_manifest.get("version", 1))
+        except (TypeError, ValueError) as e:
+            logger.warning(
+                "Skipping profile manifest migration for %s: invalid version %r (%s)",
+                profile_dir.name,
+                profile_manifest.get("version"),
+                e,
+            )
+            continue
+
+        if manifest_version >= 3:
+            continue
+
+        profile_manifest["version"] = 3
+        profile_manifest["swap_paths"] = swap_paths
+        with manifest_file.open("w", encoding="utf-8") as f:
+            json.dump(profile_manifest, f, indent=4, default=str)
+        upgraded_profiles.append(profile_dir.name)
+
+    return upgraded_profiles
 
 
 def chain_store_file_callbacks(*callbacks: OnStoreFile | None) -> OnStoreFile:
@@ -217,7 +273,11 @@ def save_live_to_profile(
         user_settings.swap_paths, excluded_files, excluded_dirs
     )
     file_index = 0
-    profile_manifest = {"version": 2, "targets": {}}
+    profile_manifest = {
+        "version": 3,
+        "swap_paths": user_settings.swap_paths,
+        "targets": {},
+    }
     global_manifest = load_global_manifest()
 
     for live_path in user_settings.swap_paths:
@@ -262,11 +322,9 @@ def save_live_to_profile(
 def _list_files_to_restore(
     profile_name: str,
     blob_store: BlobStore,
+    manifest: ProfileManifest,
 ) -> list[tuple[Path, Path]]:
 
-    manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
-    with manifest_file.open("r", encoding="utf-8") as f:
-        manifest = json.load(f)
     files_to_restore: list[tuple[Path, Path]] = []
     skipped_files_count = 0
     restored_files_count = 0
@@ -362,12 +420,20 @@ def load_profile_to_live(
     user_settings: UserSettings,
     on_load_start: OnLoadStart | None = None,
 ):
+    manifest_file = PROFILES_SNAPSHOT_DIR / profile_name / "manifest.json"
+    with manifest_file.open("r", encoding="utf-8") as f:
+        manifest: ProfileManifest = json.load(f)
     # get files to restore and remove
-    files_to_restore = _list_files_to_restore(profile_name, blob_store)
+    files_to_restore = _list_files_to_restore(profile_name, blob_store, manifest)
     excluded_files, excluded_dirs = user_settings.get_all_protected_paths()
+    swap_paths = (
+        [Path(path) for path in manifest["swap_paths"]]
+        if manifest["version"] >= 3
+        else user_settings.swap_paths
+    )
     files_to_remove = _list_files_to_remove(
         profile_name,
-        user_settings.swap_paths,
+        swap_paths,
         excluded_files=excluded_files,
         excluded_dirs=excluded_dirs,
     )

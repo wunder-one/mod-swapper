@@ -7,6 +7,7 @@ from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING
 
 from config.user_settings import UserSettings
+from functions.profile_ops import upgrade_outdated_profile_manifests
 
 if TYPE_CHECKING:
     from ui.app import App
@@ -125,6 +126,12 @@ class SettingsWindow(customtkinter.CTkToplevel):
         self.protected_paths_fr.reset_paths(self.user_settings.user_protected_paths)
 
     def apply_settings(self):
+        # Check for out of date profile manifests and update them to version 3
+        new_swap_paths = self.swap_paths_fr.get()
+        if self.user_settings.swap_paths != new_swap_paths:
+            upgrade_outdated_profile_manifests(self.user_settings.swap_paths)
+            self.user_settings.swap_paths = new_swap_paths
+        # Update other settings
         match self.install_type_fr.get():
             case "Steam":
                 self.user_settings.install_type = "steam"
@@ -133,10 +140,8 @@ class SettingsWindow(customtkinter.CTkToplevel):
             case "Custom":
                 self.user_settings.install_type = "custom"
         self.user_settings.game_folder = self.game_folder_fr.get()
-        self.user_settings.swap_paths = self.swap_paths_fr.get()
         self.user_settings.user_protected_paths = self.protected_paths_fr.get()
-        # fetch current values from settings window
-        # and save to self.user_settings
+        # Save settings
         self.user_settings.save_settings()
 
 
