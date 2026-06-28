@@ -1,8 +1,9 @@
-# Baldy Ron's Mod Swapper
-<sup>_(Let's see if I keep this name)_</sup>
+# BG3 Mod Swapper
 
 > [!WARNING]
 > This software is pre-release. Backup your game data before useing.
+>
+> Files are handeled in a safe way, but I want to have more beta testers before calling it safe.
 
 Mod swapper for Baldur's Gate 3. Let's you completely replace all mod related files between two or more different states or profiles.
 

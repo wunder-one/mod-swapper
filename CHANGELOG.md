@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.3.3] - 2026-06-28
+
+Protection for files after adding new swap folders in settings.
+
+- Fix: When adding a new swap folder, protects exsisting files when swapping profiles
+    - Bump profile manifests to version 3 and record the swap paths used when each profile was saved.
+    - When loading a profile, use the manifest's pinned swap paths (for v3+) when deciding which live files to remove, so changing settings later does not delete files outside the original swap scope.
+    - When swap paths change in Settings, automatically migrate outdated manifests to v3 with the previous swap paths pinned before applying the new paths.
+    - Refactor profile restore helpers to accept a typed manifest and expand test coverage for migration and load behavior.
+
 ## [v0.3.2] - 2026-06-20
 
 Improves Update Mods progress reporting and developer test tooling.
